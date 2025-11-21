@@ -114,7 +114,7 @@ export const useMQTT = () => {
   const reset = useCallback(() => {
     if (client && isConnected) {
       client.publish('buzzer/control', JSON.stringify({ release: "" }));
-      client.publish('buzzer/pressed', '0');
+      client.publish('buzzer/pressed', '0', { retain: true });
       setPressedBuzzerId(null);
       toast.success('Buzzers reset');
     }
