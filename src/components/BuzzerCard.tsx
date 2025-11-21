@@ -65,7 +65,6 @@ export const BuzzerCard = ({ id, name, state, pressedAt }: BuzzerCardProps) => {
           {state === "waiting" && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-sm">En attente...</span>
             </div>
           )}
 
