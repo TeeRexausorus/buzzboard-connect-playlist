@@ -3,19 +3,17 @@ import mqtt, { MqttClient } from 'mqtt';
 import { toast } from 'sonner';
 
 export interface BuzzerData {
-  id: string;
+  id: number;
   name: string;
-  isPressed: boolean;
+  state: 'waiting' | 'pressed' | 'blocked';
   pressedAt?: Date;
-  order?: number;
 }
 
 export const useMQTT = () => {
   const [client, setClient] = useState<MqttClient | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [buzzers, setBuzzers] = useState<Map<string, BuzzerData>>(new Map());
-  const [pressOrder, setPressOrder] = useState<string[]>([]);
-  const topicRef = useRef<string>('');
+  const [buzzers, setBuzzers] = useState<Map<number, BuzzerData>>(new Map());
+  const [pressedBuzzerId, setPressedBuzzerId] = useState<number | null>(null);
 
   const connect = useCallback((broker: string, topic: string, username?: string, password?: string) => {
     try {
@@ -33,8 +31,19 @@ export const useMQTT = () => {
       
       mqttClient.on('connect', () => {
         setIsConnected(true);
-        topicRef.current = topic;
-        mqttClient.subscribe(topic, (err) => {
+        
+        // Initialize 5 buzzers
+        const initialBuzzers = new Map<number, BuzzerData>();
+        for (let i = 1; i <= 5; i++) {
+          initialBuzzers.set(i, {
+            id: i,
+            name: `Buzzer ${i}`,
+            state: 'waiting',
+          });
+        }
+        setBuzzers(initialBuzzers);
+        
+        mqttClient.subscribe('buzzer/pressed', (err) => {
           if (err) {
             toast.error('Failed to subscribe to topic');
             console.error('Subscribe error:', err);
@@ -51,31 +60,13 @@ export const useMQTT = () => {
 
       mqttClient.on('message', (receivedTopic, message) => {
         try {
-          const data = JSON.parse(message.toString());
-          const buzzerId = data.id || receivedTopic.split('/').pop();
-          
-          setBuzzers(prev => {
-            const updated = new Map(prev);
-            const existing = updated.get(buzzerId);
-            
-            if (data.pressed && !existing?.isPressed) {
-              setPressOrder(order => {
-                if (!order.includes(buzzerId)) {
-                  return [...order, buzzerId];
-                }
-                return order;
-              });
+          if (receivedTopic === 'buzzer/pressed') {
+            const buzzerId = parseInt(message.toString());
+            if (buzzerId >= 1 && buzzerId <= 5) {
+              setPressedBuzzerId(buzzerId);
+              toast.success(`Buzzer ${buzzerId} pressed!`);
             }
-            
-            updated.set(buzzerId, {
-              id: buzzerId,
-              name: data.name || `Buzzer ${buzzerId}`,
-              isPressed: data.pressed || false,
-              pressedAt: data.pressed ? new Date() : existing?.pressedAt,
-            });
-            
-            return updated;
-          });
+          }
         } catch (err) {
           console.error('Error parsing message:', err);
         }
@@ -102,10 +93,12 @@ export const useMQTT = () => {
   }, [client]);
 
   const reset = useCallback(() => {
-    setBuzzers(new Map());
-    setPressOrder([]);
-    toast.success('Buzzers reset');
-  }, []);
+    if (client && isConnected) {
+      client.publish('buzzer/control', JSON.stringify({ release: "" }));
+      setPressedBuzzerId(null);
+      toast.success('Buzzers reset');
+    }
+  }, [client, isConnected]);
 
   useEffect(() => {
     return () => {
@@ -115,19 +108,22 @@ export const useMQTT = () => {
     };
   }, [client]);
 
-  // Update buzzer order based on press order
+  // Update buzzer states based on pressed buzzer
   useEffect(() => {
     setBuzzers(prev => {
       const updated = new Map(prev);
       updated.forEach((buzzer, id) => {
-        const orderIndex = pressOrder.indexOf(id);
-        if (orderIndex !== -1) {
-          updated.set(id, { ...buzzer, order: orderIndex + 1 });
+        if (pressedBuzzerId === null) {
+          updated.set(id, { ...buzzer, state: 'waiting', pressedAt: undefined });
+        } else if (id === pressedBuzzerId) {
+          updated.set(id, { ...buzzer, state: 'pressed', pressedAt: new Date() });
+        } else {
+          updated.set(id, { ...buzzer, state: 'blocked' });
         }
       });
       return updated;
     });
-  }, [pressOrder]);
+  }, [pressedBuzzerId]);
 
   return {
     isConnected,
