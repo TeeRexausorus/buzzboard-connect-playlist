@@ -100,6 +100,13 @@ export const useMQTT = () => {
     }
   }, [client, isConnected]);
 
+  const releaseBuzzer = useCallback((buzzerId: number) => {
+    if (client && isConnected) {
+      client.publish('buzzer/control', JSON.stringify({ release: [buzzerId] }));
+      toast.success(`Buzzer ${buzzerId} libéré`);
+    }
+  }, [client, isConnected]);
+
   useEffect(() => {
     return () => {
       if (client) {
@@ -131,5 +138,6 @@ export const useMQTT = () => {
     connect,
     disconnect,
     reset,
+    releaseBuzzer,
   };
 };
