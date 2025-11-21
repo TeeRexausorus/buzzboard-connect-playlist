@@ -7,9 +7,10 @@ interface BuzzerCardProps {
   name: string;
   state: 'waiting' | 'pressed' | 'blocked';
   pressedAt?: Date;
+  onRelease?: () => void;
 }
 
-export const BuzzerCard = ({ id, name, state, pressedAt }: BuzzerCardProps) => {
+export const BuzzerCard = ({ id, name, state, pressedAt, onRelease }: BuzzerCardProps) => {
   const colors = {
     waiting: 'bg-blue-500/20 border-blue-500',
     pressed: 'bg-green-500/20 border-green-500 buzzer-glow',
@@ -38,7 +39,10 @@ export const BuzzerCard = ({ id, name, state, pressedAt }: BuzzerCardProps) => {
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
     >
       <Card 
-        className={`p-6 relative overflow-hidden transition-all duration-300 ${colors[state]}`}
+        className={`p-6 relative overflow-hidden transition-all duration-300 ${colors[state]} ${
+          state === 'pressed' || state === 'blocked' ? 'cursor-pointer hover:opacity-80' : ''
+        }`}
+        onClick={() => (state === 'pressed' || state === 'blocked') && onRelease?.()}
       >
         {state === 'pressed' && (
           <motion.div
