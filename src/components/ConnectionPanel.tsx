@@ -13,10 +13,10 @@ interface ConnectionPanelProps {
 }
 
 export const ConnectionPanel = ({ isConnected, onConnect, onDisconnect }: ConnectionPanelProps) => {
-  const [broker, setBroker] = useState("wss://test.mosquitto.org:8081");
+  const [broker, setBroker] = useState("mqtts://puksrw.stackhero-network.com:13533/");
   const [topic, setTopic] = useState("buzzers/#");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("sensor");
+  const [password, setPassword] = useState("5sHLvQMhRunOs2MWkFN6B2m5JLi9OQxX");
 
   const handleConnect = () => {
     onConnect(broker, topic, username || undefined, password || undefined);
