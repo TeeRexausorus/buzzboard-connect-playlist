@@ -46,7 +46,6 @@ export const ConnectionPanel = ({ isConnected, onConnect, onDisconnect }: Connec
             onClick={isConnected ? onDisconnect : handleConnect}
             size="sm"
             variant={isConnected ? "destructive" : "default"}
-            disabled={!isConnected && !isExpanded}
           >
             {isConnected ? "Déconnecter" : "Connecter"}
           </Button>
