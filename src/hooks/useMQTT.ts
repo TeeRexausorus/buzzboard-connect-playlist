@@ -15,6 +15,24 @@ export const useMQTT = () => {
   const [buzzers, setBuzzers] = useState<Map<number, BuzzerData>>(new Map());
   const [pressedBuzzerId, setPressedBuzzerId] = useState<number | null>(null);
 
+  // Load buzzer names from localStorage
+  const loadBuzzerNames = useCallback(() => {
+    const stored = localStorage.getItem('buzzerNames');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  }, []);
+
+  // Save buzzer names to localStorage
+  const saveBuzzerNames = useCallback((names: Record<number, string>) => {
+    localStorage.setItem('buzzerNames', JSON.stringify(names));
+  }, []);
+
   const connect = useCallback((broker: string, topic: string, username?: string, password?: string) => {
     try {
       const options: mqtt.IClientOptions = {
@@ -32,12 +50,13 @@ export const useMQTT = () => {
       mqttClient.on('connect', () => {
         setIsConnected(true);
         
-        // Initialize 5 buzzers
+        // Initialize 5 buzzers with saved names
+        const savedNames = loadBuzzerNames();
         const initialBuzzers = new Map<number, BuzzerData>();
         for (let i = 1; i <= 5; i++) {
           initialBuzzers.set(i, {
             id: i,
-            name: `Buzzer ${i}`,
+            name: savedNames[i] || `Buzzer ${i}`,
             state: 'waiting',
           });
         }
@@ -100,6 +119,22 @@ export const useMQTT = () => {
     }
   }, [client, isConnected]);
 
+  const renameBuzzer = useCallback((id: number, newName: string) => {
+    setBuzzers(prev => {
+      const updated = new Map(prev);
+      const buzzer = updated.get(id);
+      if (buzzer) {
+        updated.set(id, { ...buzzer, name: newName });
+      }
+      return updated;
+    });
+
+    // Save to localStorage
+    const names = loadBuzzerNames();
+    names[id] = newName;
+    saveBuzzerNames(names);
+  }, [loadBuzzerNames, saveBuzzerNames]);
+
   useEffect(() => {
     return () => {
       if (client) {
@@ -131,5 +166,6 @@ export const useMQTT = () => {
     connect,
     disconnect,
     reset,
+    renameBuzzer,
   };
 };

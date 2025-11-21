@@ -1,15 +1,35 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Pencil, Check, X } from "lucide-react";
 
 interface BuzzerCardProps {
   id: number;
   name: string;
   state: 'waiting' | 'pressed' | 'blocked';
   pressedAt?: Date;
+  onRename?: (id: number, newName: string) => void;
 }
 
-export const BuzzerCard = ({ id, name, state, pressedAt }: BuzzerCardProps) => {
+export const BuzzerCard = ({ id, name, state, pressedAt, onRename }: BuzzerCardProps) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedName, setEditedName] = useState(name);
+  
+  const handleSave = () => {
+    if (editedName.trim() && onRename) {
+      onRename(id, editedName.trim());
+      setIsEditing(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditedName(name);
+    setIsEditing(false);
+  };
+  
   const colors = {
     waiting: 'bg-blue-500/20 border-blue-500',
     pressed: 'bg-green-500/20 border-green-500 buzzer-glow',
@@ -51,12 +71,47 @@ export const BuzzerCard = ({ id, name, state, pressedAt }: BuzzerCardProps) => {
         
         <div className="relative z-10">
           <div className="flex justify-between items-start mb-4">
-            <h3 className="text-3xl font-display font-bold text-foreground">
-              {name}
-            </h3>
-            <Badge variant="secondary" className={`text-lg font-display ${textColors[state]}`}>
-              {labels[state]}
-            </Badge>
+            {isEditing ? (
+              <div className="flex items-center gap-2 flex-1 mr-2">
+                <Input
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  className="text-xl font-bold"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSave();
+                    if (e.key === 'Escape') handleCancel();
+                  }}
+                />
+                <Button size="icon" variant="ghost" onClick={handleSave} className="h-8 w-8">
+                  <Check className="w-4 h-4" />
+                </Button>
+                <Button size="icon" variant="ghost" onClick={handleCancel} className="h-8 w-8">
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-3xl font-display font-bold text-foreground">
+                    {name}
+                  </h3>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setIsEditing(true)}
+                    className="h-8 w-8 opacity-50 hover:opacity-100"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                </div>
+              </>
+            )}
+            {!isEditing && (
+              <Badge variant="secondary" className={`text-lg font-display ${textColors[state]}`}>
+                {labels[state]}
+              </Badge>
+            )}
           </div>
           
           {state === 'pressed' && pressedAt && (
