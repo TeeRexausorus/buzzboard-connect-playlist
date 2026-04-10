@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Pencil, Check, X, Lock, Unlock } from "lucide-react";
+import { Pencil, Check, X, Lock, Unlock, Trophy } from "lucide-react";
 
 interface BuzzerCardProps {
   id: number;
