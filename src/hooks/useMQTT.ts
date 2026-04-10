@@ -7,6 +7,7 @@ export interface BuzzerData {
   name: string;
   state: 'waiting' | 'pressed' | 'blocked';
   pressedAt?: Date;
+  locked: boolean;
 }
 
 export const useMQTT = () => {
@@ -58,6 +59,7 @@ export const useMQTT = () => {
             id: i,
             name: savedNames[i] || `Buzzer ${i}`,
             state: 'waiting',
+            locked: false,
           });
         }
         setBuzzers(initialBuzzers);
@@ -136,11 +138,28 @@ export const useMQTT = () => {
       return updated;
     });
 
-    // Save to localStorage
     const names = loadBuzzerNames();
     names[id] = newName;
     saveBuzzerNames(names);
   }, [loadBuzzerNames, saveBuzzerNames]);
+
+  const toggleLock = useCallback((id: number) => {
+    setBuzzers(prev => {
+      const updated = new Map(prev);
+      const buzzer = updated.get(id);
+      if (buzzer && client && isConnected) {
+        const newLocked = !buzzer.locked;
+        updated.set(id, { ...buzzer, locked: newLocked });
+        const topic = 'buzzer/control';
+        if (newLocked) {
+          client.publish(topic, JSON.stringify({ lock: [id] }));
+        } else {
+          client.publish(topic, JSON.stringify({ unlock: [id] }));
+        }
+      }
+      return updated;
+    });
+  }, [client, isConnected]);
 
   useEffect(() => {
     return () => {
@@ -174,5 +193,6 @@ export const useMQTT = () => {
     disconnect,
     reset,
     renameBuzzer,
+    toggleLock,
   };
 };
