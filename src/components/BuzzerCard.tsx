@@ -12,11 +12,12 @@ interface BuzzerCardProps {
   state: 'waiting' | 'pressed' | 'blocked';
   pressedAt?: Date;
   locked: boolean;
+  score: number;
   onRename?: (id: number, newName: string) => void;
   onToggleLock?: (id: number) => void;
 }
 
-export const BuzzerCard = ({ id, name, state, pressedAt, locked, onRename, onToggleLock }: BuzzerCardProps) => {
+export const BuzzerCard = ({ id, name, state, pressedAt, locked, score, onRename, onToggleLock }: BuzzerCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
   

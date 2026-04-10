@@ -186,7 +186,7 @@ export const useMQTT = () => {
       setPressedBuzzerId(null);
       toast.success('Bonne réponse ! Buzzers libérés');
     }
-  }, [client, isConnected, buzzers]);
+  }, [client, isConnected, buzzers, pressedBuzzerId, pointValue, saveBuzzerScores]);
 
   const handleWrong = useCallback(() => {
     if (client && isConnected && pressedBuzzerId !== null) {
