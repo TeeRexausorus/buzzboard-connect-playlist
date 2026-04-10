@@ -171,12 +171,16 @@ export const useMQTT = () => {
       if (lockedIds.length > 0) {
         client.publish('buzzer/control', JSON.stringify({ unlock: lockedIds }));
       }
-      // Update local state
+      // Update local state - add points to the pressed buzzer
       setBuzzers(prev => {
         const updated = new Map(prev);
+        const scores: Record<number, number> = {};
         updated.forEach((buzzer, id) => {
-          updated.set(id, { ...buzzer, locked: false, state: 'waiting', pressedAt: undefined });
+          const newScore = id === pressedBuzzerId ? buzzer.score + pointValue : buzzer.score;
+          updated.set(id, { ...buzzer, locked: false, state: 'waiting', pressedAt: undefined, score: newScore });
+          scores[id] = newScore;
         });
+        saveBuzzerScores(scores);
         return updated;
       });
       setPressedBuzzerId(null);
@@ -267,10 +271,28 @@ export const useMQTT = () => {
     });
   }, [pressedBuzzerId]);
 
+  const updatePointValue = useCallback((value: number) => {
+    setPointValue(value);
+    localStorage.setItem('buzzerPointValue', String(value));
+  }, []);
+
+  const resetScores = useCallback(() => {
+    setBuzzers(prev => {
+      const updated = new Map(prev);
+      updated.forEach((buzzer, id) => {
+        updated.set(id, { ...buzzer, score: 0 });
+      });
+      return updated;
+    });
+    localStorage.removeItem('buzzerScores');
+    toast.success('Scores remis à zéro');
+  }, []);
+
   return {
     isConnected,
     buzzers,
     pressedBuzzerId,
+    pointValue,
     connect,
     disconnect,
     reset,
@@ -278,5 +300,7 @@ export const useMQTT = () => {
     toggleLock,
     handleCorrect,
     handleWrong,
+    updatePointValue,
+    resetScores,
   };
 };
