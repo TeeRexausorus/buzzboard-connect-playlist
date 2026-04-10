@@ -6,7 +6,7 @@ import { RotateCcw, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Index = () => {
-  const { isConnected, buzzers, connect, disconnect, reset, renameBuzzer } = useMQTT();
+  const { isConnected, buzzers, connect, disconnect, reset, renameBuzzer, toggleLock } = useMQTT();
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -76,7 +76,7 @@ const Index = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.3, delay: index * 0.1 }}
               >
-                <BuzzerCard {...buzzer} onRename={renameBuzzer} />
+                <BuzzerCard {...buzzer} onRename={renameBuzzer} onToggleLock={toggleLock} />
               </motion.div>
             ))}
           </motion.div>

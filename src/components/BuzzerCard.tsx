@@ -4,17 +4,19 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Pencil, Check, X } from "lucide-react";
+import { Pencil, Check, X, Lock, Unlock } from "lucide-react";
 
 interface BuzzerCardProps {
   id: number;
   name: string;
   state: 'waiting' | 'pressed' | 'blocked';
   pressedAt?: Date;
+  locked: boolean;
   onRename?: (id: number, newName: string) => void;
+  onToggleLock?: (id: number) => void;
 }
 
-export const BuzzerCard = ({ id, name, state, pressedAt, onRename }: BuzzerCardProps) => {
+export const BuzzerCard = ({ id, name, state, pressedAt, locked, onRename, onToggleLock }: BuzzerCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
   
@@ -108,9 +110,20 @@ export const BuzzerCard = ({ id, name, state, pressedAt, onRename }: BuzzerCardP
               </>
             )}
             {!isEditing && (
-              <Badge variant="secondary" className={`text-lg font-display ${textColors[state]}`}>
-                {labels[state]}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => onToggleLock?.(id)}
+                  className={`h-8 w-8 ${locked ? 'text-yellow-400 opacity-100' : 'opacity-50 hover:opacity-100'}`}
+                  title={locked ? 'Déverrouiller' : 'Verrouiller'}
+                >
+                  {locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                </Button>
+                <Badge variant="secondary" className={`text-lg font-display ${textColors[state]}`}>
+                  {locked ? 'Verrouillé' : labels[state]}
+                </Badge>
+              </div>
             )}
           </div>
           
