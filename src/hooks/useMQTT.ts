@@ -128,6 +128,57 @@ export const useMQTT = () => {
     }
   }, [client, isConnected]);
 
+  const handleCorrect = useCallback(() => {
+    if (client && isConnected) {
+      // Release all buzzers
+      client.publish('buzzer/control', JSON.stringify({ release: "" }));
+      client.publish('buzzer/pressed', JSON.stringify({ pressed: 0 }), { retain: true });
+      // Unlock all locked buzzers
+      const lockedIds: number[] = [];
+      buzzers.forEach((buzzer) => {
+        if (buzzer.locked) lockedIds.push(buzzer.id);
+      });
+      if (lockedIds.length > 0) {
+        client.publish('buzzer/control', JSON.stringify({ unlock: lockedIds }));
+      }
+      // Update local state
+      setBuzzers(prev => {
+        const updated = new Map(prev);
+        updated.forEach((buzzer, id) => {
+          updated.set(id, { ...buzzer, locked: false, state: 'waiting', pressedAt: undefined });
+        });
+        return updated;
+      });
+      setPressedBuzzerId(null);
+      toast.success('Bonne réponse ! Buzzers libérés');
+    }
+  }, [client, isConnected, buzzers]);
+
+  const handleWrong = useCallback(() => {
+    if (client && isConnected && pressedBuzzerId !== null) {
+      // Lock the buzzer that had the hand
+      client.publish('buzzer/control', JSON.stringify({ lock: [pressedBuzzerId] }));
+      // Release all buzzers
+      client.publish('buzzer/control', JSON.stringify({ release: "" }));
+      client.publish('buzzer/pressed', JSON.stringify({ pressed: 0 }), { retain: true });
+      // Update local state
+      setBuzzers(prev => {
+        const updated = new Map(prev);
+        updated.forEach((buzzer, id) => {
+          if (id === pressedBuzzerId) {
+            updated.set(id, { ...buzzer, locked: true, state: 'waiting', pressedAt: undefined });
+          } else {
+            updated.set(id, { ...buzzer, state: 'waiting', pressedAt: undefined });
+          }
+        });
+        return updated;
+      });
+      const lockedName = buzzers.get(pressedBuzzerId)?.name || `Buzzer ${pressedBuzzerId}`;
+      setPressedBuzzerId(null);
+      toast.error(`Mauvaise réponse ! ${lockedName} verrouillé`);
+    }
+  }, [client, isConnected, pressedBuzzerId, buzzers]);
+
   const renameBuzzer = useCallback((id: number, newName: string) => {
     setBuzzers(prev => {
       const updated = new Map(prev);
@@ -188,11 +239,14 @@ export const useMQTT = () => {
 
   return {
     isConnected,
-    buzzers: Array.from(buzzers.values()),
+    buzzers,
+    pressedBuzzerId,
     connect,
     disconnect,
     reset,
     renameBuzzer,
     toggleLock,
+    handleCorrect,
+    handleWrong,
   };
 };
