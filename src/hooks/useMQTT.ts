@@ -79,11 +79,18 @@ export const useMQTT = () => {
 
       mqttClient.on('message', (receivedTopic, message) => {
         try {
+          const raw = message.toString();
+          console.log('[MQTT] Message received:', receivedTopic, 'raw:', JSON.stringify(raw));
           if (receivedTopic === 'buzzer/pressed') {
-            const buzzerId = parseInt(message.toString());
+            const buzzerId = parseInt(raw);
+            console.log('[MQTT] Parsed buzzerId:', buzzerId);
             if (buzzerId >= 1 && buzzerId <= 5) {
+              console.log('[MQTT] Setting pressedBuzzerId to', buzzerId);
               setPressedBuzzerId(buzzerId);
               toast.success(`Buzzer ${buzzerId} pressed!`);
+            } else if (buzzerId === 0) {
+              console.log('[MQTT] Reset received (0)');
+              setPressedBuzzerId(null);
             }
           }
         } catch (err) {
