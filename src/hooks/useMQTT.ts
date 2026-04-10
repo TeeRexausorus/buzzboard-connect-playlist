@@ -64,8 +64,9 @@ export const useMQTT = () => {
       mqttClient.on('connect', () => {
         setIsConnected(true);
         
-        // Initialize 5 buzzers with saved names
+        // Initialize 5 buzzers with saved names and scores
         const savedNames = loadBuzzerNames();
+        const savedScores = loadBuzzerScores();
         const initialBuzzers = new Map<number, BuzzerData>();
         for (let i = 1; i <= 5; i++) {
           initialBuzzers.set(i, {
@@ -73,6 +74,7 @@ export const useMQTT = () => {
             name: savedNames[i] || `Buzzer ${i}`,
             state: 'waiting',
             locked: false,
+            score: savedScores[i] || 0,
           });
         }
         setBuzzers(initialBuzzers);
