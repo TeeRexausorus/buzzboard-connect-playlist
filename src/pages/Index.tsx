@@ -2,11 +2,13 @@ import { Button } from "@/components/ui/button";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { BuzzerCard } from "@/components/BuzzerCard";
 import { useMQTT } from "@/hooks/useMQTT";
-import { RotateCcw, Zap } from "lucide-react";
+import { RotateCcw, Zap, CheckCircle, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Index = () => {
-  const { isConnected, buzzers, connect, disconnect, reset, renameBuzzer, toggleLock } = useMQTT();
+  const { isConnected, buzzers, pressedBuzzerId, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong } = useMQTT();
+
+  const buzzerList = Array.from(buzzers.values());
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -45,31 +47,47 @@ const Index = () => {
         {/* Control Panel */}
         {isConnected && (
           <motion.div
-            className="flex justify-center gap-4"
+            className="flex justify-center gap-4 flex-wrap"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
+            <Button
+              onClick={handleCorrect}
+              disabled={pressedBuzzerId === null}
+              className="bg-green-600 hover:bg-green-700 text-white font-semibold"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Correct
+            </Button>
+            <Button
+              onClick={handleWrong}
+              disabled={pressedBuzzerId === null}
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold"
+            >
+              <XCircle className="w-4 h-4 mr-2" />
+              Faux
+            </Button>
             <Button
               onClick={reset}
               variant="outline"
               className="bg-card border-border hover:bg-muted text-foreground font-semibold"
             >
               <RotateCcw className="w-4 h-4 mr-2" />
-              Reset All Buzzers
+              Reset All
             </Button>
           </motion.div>
         )}
 
         {/* Buzzers Grid */}
-        {buzzers.length > 0 ? (
+        {buzzerList.length > 0 ? (
           <motion.div
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.3 }}
           >
-            {buzzers.map((buzzer, index) => (
+            {buzzerList.map((buzzer, index) => (
               <motion.div
                 key={buzzer.id}
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -114,7 +132,7 @@ const Index = () => {
               <div className="mt-6 p-4 bg-card border border-border rounded-lg max-w-2xl mx-auto text-left">
                 <p className="font-semibold text-foreground mb-2">Expected message format:</p>
                 <code className="text-sm text-primary">
-                  {`{ "id": "buzzer_1", "name": "Player 1", "pressed": true }`}
+                  {`{ "pressed": 1 }`}
                 </code>
               </div>
             </div>
