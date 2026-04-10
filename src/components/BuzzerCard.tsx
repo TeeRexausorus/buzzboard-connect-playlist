@@ -127,6 +127,12 @@ export const BuzzerCard = ({ id, name, state, pressedAt, locked, score, onRename
               </div>
             )}
           </div>
+
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy className="w-5 h-5 text-yellow-400" />
+            <span className="text-2xl font-display font-bold text-foreground">{score}</span>
+            <span className="text-sm text-muted-foreground">pts</span>
+          </div>
           
           {state === 'pressed' && pressedAt && (
             <motion.p 
