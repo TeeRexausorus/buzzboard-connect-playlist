@@ -121,7 +121,11 @@ export const BuzzerCard = ({ id, name, state, pressedAt, locked, score, onRename
                 >
                   {locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                 </Button>
-                <Badge variant="secondary" className={`text-lg font-display ${textColors[state]}`}>
+                <Badge className={`text-sm font-semibold px-3 py-1 border ${
+                  state === 'waiting' ? 'bg-blue-500/30 border-blue-400 text-blue-100' :
+                  state === 'pressed' ? 'bg-green-500/30 border-green-400 text-green-100' :
+                  'bg-red-500/30 border-red-400 text-red-100'
+                } ${locked ? 'bg-yellow-500/30 border-yellow-400 text-yellow-100' : ''}`}>
                   {locked ? 'Verrouillé' : labels[state]}
                 </Badge>
               </div>
