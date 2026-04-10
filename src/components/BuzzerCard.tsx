@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Pencil, Check, X, Lock, Unlock } from "lucide-react";
+import { Pencil, Check, X, Lock, Unlock, Trophy } from "lucide-react";
 
 interface BuzzerCardProps {
   id: number;
@@ -12,11 +12,12 @@ interface BuzzerCardProps {
   state: 'waiting' | 'pressed' | 'blocked';
   pressedAt?: Date;
   locked: boolean;
+  score: number;
   onRename?: (id: number, newName: string) => void;
   onToggleLock?: (id: number) => void;
 }
 
-export const BuzzerCard = ({ id, name, state, pressedAt, locked, onRename, onToggleLock }: BuzzerCardProps) => {
+export const BuzzerCard = ({ id, name, state, pressedAt, locked, score, onRename, onToggleLock }: BuzzerCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
   
@@ -125,6 +126,12 @@ export const BuzzerCard = ({ id, name, state, pressedAt, locked, onRename, onTog
                 </Badge>
               </div>
             )}
+          </div>
+
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy className="w-5 h-5 text-yellow-400" />
+            <span className="text-2xl font-display font-bold text-foreground">{score}</span>
+            <span className="text-sm text-muted-foreground">pts</span>
           </div>
           
           {state === 'pressed' && pressedAt && (

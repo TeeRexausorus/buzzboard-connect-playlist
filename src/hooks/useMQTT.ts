@@ -8,6 +8,7 @@ export interface BuzzerData {
   state: 'waiting' | 'pressed' | 'blocked';
   pressedAt?: Date;
   locked: boolean;
+  score: number;
 }
 
 export const useMQTT = () => {
@@ -15,23 +16,35 @@ export const useMQTT = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [buzzers, setBuzzers] = useState<Map<number, BuzzerData>>(new Map());
   const [pressedBuzzerId, setPressedBuzzerId] = useState<number | null>(null);
+  const [pointValue, setPointValue] = useState(() => {
+    const stored = localStorage.getItem('buzzerPointValue');
+    return stored ? parseInt(stored, 10) || 1 : 1;
+  });
 
   // Load buzzer names from localStorage
   const loadBuzzerNames = useCallback(() => {
     const stored = localStorage.getItem('buzzerNames');
     if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch {
-        return {};
-      }
+      try { return JSON.parse(stored); } catch { return {}; }
     }
     return {};
   }, []);
 
-  // Save buzzer names to localStorage
+  // Load buzzer scores from localStorage
+  const loadBuzzerScores = useCallback(() => {
+    const stored = localStorage.getItem('buzzerScores');
+    if (stored) {
+      try { return JSON.parse(stored); } catch { return {}; }
+    }
+    return {};
+  }, []);
+
   const saveBuzzerNames = useCallback((names: Record<number, string>) => {
     localStorage.setItem('buzzerNames', JSON.stringify(names));
+  }, []);
+
+  const saveBuzzerScores = useCallback((scores: Record<number, number>) => {
+    localStorage.setItem('buzzerScores', JSON.stringify(scores));
   }, []);
 
   const connect = useCallback((broker: string, topic: string, username?: string, password?: string) => {
@@ -51,8 +64,9 @@ export const useMQTT = () => {
       mqttClient.on('connect', () => {
         setIsConnected(true);
         
-        // Initialize 5 buzzers with saved names
+        // Initialize 5 buzzers with saved names and scores
         const savedNames = loadBuzzerNames();
+        const savedScores = loadBuzzerScores();
         const initialBuzzers = new Map<number, BuzzerData>();
         for (let i = 1; i <= 5; i++) {
           initialBuzzers.set(i, {
@@ -60,6 +74,7 @@ export const useMQTT = () => {
             name: savedNames[i] || `Buzzer ${i}`,
             state: 'waiting',
             locked: false,
+            score: savedScores[i] || 0,
           });
         }
         setBuzzers(initialBuzzers);
@@ -156,18 +171,22 @@ export const useMQTT = () => {
       if (lockedIds.length > 0) {
         client.publish('buzzer/control', JSON.stringify({ unlock: lockedIds }));
       }
-      // Update local state
+      // Update local state - add points to the pressed buzzer
       setBuzzers(prev => {
         const updated = new Map(prev);
+        const scores: Record<number, number> = {};
         updated.forEach((buzzer, id) => {
-          updated.set(id, { ...buzzer, locked: false, state: 'waiting', pressedAt: undefined });
+          const newScore = id === pressedBuzzerId ? buzzer.score + pointValue : buzzer.score;
+          updated.set(id, { ...buzzer, locked: false, state: 'waiting', pressedAt: undefined, score: newScore });
+          scores[id] = newScore;
         });
+        saveBuzzerScores(scores);
         return updated;
       });
       setPressedBuzzerId(null);
       toast.success('Bonne réponse ! Buzzers libérés');
     }
-  }, [client, isConnected, buzzers]);
+  }, [client, isConnected, buzzers, pressedBuzzerId, pointValue, saveBuzzerScores]);
 
   const handleWrong = useCallback(() => {
     if (client && isConnected && pressedBuzzerId !== null) {
@@ -252,10 +271,28 @@ export const useMQTT = () => {
     });
   }, [pressedBuzzerId]);
 
+  const updatePointValue = useCallback((value: number) => {
+    setPointValue(value);
+    localStorage.setItem('buzzerPointValue', String(value));
+  }, []);
+
+  const resetScores = useCallback(() => {
+    setBuzzers(prev => {
+      const updated = new Map(prev);
+      updated.forEach((buzzer, id) => {
+        updated.set(id, { ...buzzer, score: 0 });
+      });
+      return updated;
+    });
+    localStorage.removeItem('buzzerScores');
+    toast.success('Scores remis à zéro');
+  }, []);
+
   return {
     isConnected,
     buzzers,
     pressedBuzzerId,
+    pointValue,
     connect,
     disconnect,
     reset,
@@ -263,5 +300,7 @@ export const useMQTT = () => {
     toggleLock,
     handleCorrect,
     handleWrong,
+    updatePointValue,
+    resetScores,
   };
 };

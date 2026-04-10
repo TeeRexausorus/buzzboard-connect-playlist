@@ -1,12 +1,17 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { BuzzerCard } from "@/components/BuzzerCard";
 import { useMQTT } from "@/hooks/useMQTT";
-import { RotateCcw, Zap, CheckCircle, XCircle } from "lucide-react";
+import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Index = () => {
-  const { isConnected, buzzers, pressedBuzzerId, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong } = useMQTT();
+  const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores } = useMQTT();
+  const [showConfig, setShowConfig] = useState(false);
 
   const buzzerList = Array.from(buzzers.values());
 
@@ -76,6 +81,47 @@ const Index = () => {
               <RotateCcw className="w-4 h-4 mr-2" />
               Reset All
             </Button>
+            <Button
+              onClick={() => setShowConfig(!showConfig)}
+              variant="outline"
+              className="bg-card border-border hover:bg-muted text-foreground font-semibold"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Config
+            </Button>
+          </motion.div>
+        )}
+
+        {/* Config Panel */}
+        {isConnected && showConfig && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card className="p-4 bg-card/50 border-border/50 backdrop-blur-sm">
+              <div className="flex flex-wrap items-end gap-4">
+                <div>
+                  <Label htmlFor="pointValue" className="text-sm text-foreground">Valeur d'un point</Label>
+                  <Input
+                    id="pointValue"
+                    type="number"
+                    min={1}
+                    value={pointValue}
+                    onChange={(e) => updatePointValue(parseInt(e.target.value, 10) || 1)}
+                    className="w-24 bg-input border-border text-foreground mt-1"
+                  />
+                </div>
+                <Button
+                  onClick={resetScores}
+                  variant="outline"
+                  className="bg-card border-border hover:bg-muted text-foreground font-semibold"
+                >
+                  <Trophy className="w-4 h-4 mr-2" />
+                  RAZ Scores
+                </Button>
+              </div>
+            </Card>
           </motion.div>
         )}
 
