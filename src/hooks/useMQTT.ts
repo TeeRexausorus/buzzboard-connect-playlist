@@ -8,6 +8,7 @@ export interface BuzzerData {
   state: 'waiting' | 'pressed' | 'blocked';
   pressedAt?: Date;
   locked: boolean;
+  score: number;
 }
 
 export const useMQTT = () => {
