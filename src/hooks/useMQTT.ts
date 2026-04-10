@@ -123,10 +123,25 @@ export const useMQTT = () => {
     if (client && isConnected) {
       client.publish('buzzer/control', JSON.stringify({ release: "" }));
       client.publish('buzzer/pressed', JSON.stringify({ pressed: 0 }), { retain: true });
+      // Unlock all locked buzzers
+      const lockedIds: number[] = [];
+      buzzers.forEach((buzzer) => {
+        if (buzzer.locked) lockedIds.push(buzzer.id);
+      });
+      if (lockedIds.length > 0) {
+        client.publish('buzzer/control', JSON.stringify({ unlock: lockedIds }));
+      }
+      setBuzzers(prev => {
+        const updated = new Map(prev);
+        updated.forEach((buzzer, id) => {
+          updated.set(id, { ...buzzer, locked: false, state: 'waiting', pressedAt: undefined });
+        });
+        return updated;
+      });
       setPressedBuzzerId(null);
       toast.success('Buzzers reset');
     }
-  }, [client, isConnected]);
+  }, [client, isConnected, buzzers]);
 
   const handleCorrect = useCallback(() => {
     if (client && isConnected) {
