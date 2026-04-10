@@ -13,10 +13,10 @@ interface ConnectionPanelProps {
 }
 
 export const ConnectionPanel = ({ isConnected, onConnect, onDisconnect }: ConnectionPanelProps) => {
-  const [broker, setBroker] = useState("wss://puksrw.stackhero-network.com/");
+  const [broker, setBroker] = useState("ws://localhost:9001/");
   const [topic, setTopic] = useState("buzzers/#");
-  const [username, setUsername] = useState("sensor");
-  const [password, setPassword] = useState("5sHLvQMhRunOs2MWkFN6B2m5JLi9OQxX");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleConnect = () => {
@@ -27,7 +27,7 @@ export const ConnectionPanel = ({ isConnected, onConnect, onDisconnect }: Connec
     <Card className="p-4 bg-card/50 border-border/50 backdrop-blur-sm">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Badge 
+          <Badge
             variant={isConnected ? "default" : "secondary"}
             className={`flex items-center gap-2 ${isConnected ? 'bg-accent text-accent-foreground' : ''}`}
           >
