@@ -16,23 +16,35 @@ export const useMQTT = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [buzzers, setBuzzers] = useState<Map<number, BuzzerData>>(new Map());
   const [pressedBuzzerId, setPressedBuzzerId] = useState<number | null>(null);
+  const [pointValue, setPointValue] = useState(() => {
+    const stored = localStorage.getItem('buzzerPointValue');
+    return stored ? parseInt(stored, 10) || 1 : 1;
+  });
 
   // Load buzzer names from localStorage
   const loadBuzzerNames = useCallback(() => {
     const stored = localStorage.getItem('buzzerNames');
     if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch {
-        return {};
-      }
+      try { return JSON.parse(stored); } catch { return {}; }
     }
     return {};
   }, []);
 
-  // Save buzzer names to localStorage
+  // Load buzzer scores from localStorage
+  const loadBuzzerScores = useCallback(() => {
+    const stored = localStorage.getItem('buzzerScores');
+    if (stored) {
+      try { return JSON.parse(stored); } catch { return {}; }
+    }
+    return {};
+  }, []);
+
   const saveBuzzerNames = useCallback((names: Record<number, string>) => {
     localStorage.setItem('buzzerNames', JSON.stringify(names));
+  }, []);
+
+  const saveBuzzerScores = useCallback((scores: Record<number, number>) => {
+    localStorage.setItem('buzzerScores', JSON.stringify(scores));
   }, []);
 
   const connect = useCallback((broker: string, topic: string, username?: string, password?: string) => {
