@@ -19,7 +19,7 @@ const Index = () => {
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <motion.div 
+        <motion.div
           className="text-center space-y-4"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -79,7 +79,7 @@ const Index = () => {
               className="bg-card border-border hover:bg-muted text-foreground font-semibold"
             >
               <RotateCcw className="w-4 h-4 mr-2" />
-              Reset All
+              Reset All Buzzers
             </Button>
             <Button
               onClick={() => setShowConfig(!showConfig)}
