@@ -66,6 +66,7 @@ export const useMQTT = () => {
       
       mqttClient.on('connect', () => {
         setIsConnected(true);
+        localStorage.setItem('buzzerBrokerUrl', connectBrokerRef.current);
         
         // Initialize 5 buzzers with saved names and scores
         const savedNames = loadBuzzerNames();
