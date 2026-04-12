@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import mqtt, { MqttClient } from 'mqtt';
-import { toast } from 'sonner';
+import { useState, useEffect, useCallback, useRef } from "react";
+import mqtt, { MqttClient } from "mqtt";
+import { toast } from "sonner";
 
 export interface BuzzerData {
   id: number;
   name: string;
-  state: 'waiting' | 'pressed' | 'blocked';
+  state: "waiting" | "pressed" | "blocked";
   pressedAt?: Date;
   locked: boolean;
   score: number;
@@ -17,37 +17,45 @@ export const useMQTT = () => {
   const [buzzers, setBuzzers] = useState<Map<number, BuzzerData>>(new Map());
   const [pressedBuzzerId, setPressedBuzzerId] = useState<number | null>(null);
   const [pointValue, setPointValue] = useState(() => {
-    const stored = localStorage.getItem('buzzerPointValue');
+    const stored = localStorage.getItem("buzzerPointValue");
     return stored ? parseInt(stored, 10) || 1 : 1;
   });
 
   // Load buzzer names from localStorage
   const loadBuzzerNames = useCallback(() => {
-    const stored = localStorage.getItem('buzzerNames');
+    const stored = localStorage.getItem("buzzerNames");
     if (stored) {
-      try { return JSON.parse(stored); } catch { return {}; }
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return {};
+      }
     }
     return {};
   }, []);
 
   // Load buzzer scores from localStorage
   const loadBuzzerScores = useCallback(() => {
-    const stored = localStorage.getItem('buzzerScores');
+    const stored = localStorage.getItem("buzzerScores");
     if (stored) {
-      try { return JSON.parse(stored); } catch { return {}; }
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return {};
+      }
     }
     return {};
   }, []);
 
   const saveBuzzerNames = useCallback((names: Record<number, string>) => {
-    localStorage.setItem('buzzerNames', JSON.stringify(names));
+    localStorage.setItem("buzzerNames", JSON.stringify(names));
   }, []);
 
   const saveBuzzerScores = useCallback((scores: Record<number, number>) => {
-    localStorage.setItem('buzzerScores', JSON.stringify(scores));
+    localStorage.setItem("buzzerScores", JSON.stringify(scores));
   }, []);
 
-  const connectBrokerRef = useRef('');
+  const connectBrokerRef = useRef("");
 
   const connect = useCallback((broker: string, topic: string, username?: string, password?: string) => {
     connectBrokerRef.current = broker;
@@ -63,11 +71,11 @@ export const useMQTT = () => {
       }
 
       const mqttClient = mqtt.connect(broker, options);
-      
-      mqttClient.on('connect', () => {
+
+      mqttClient.on("connect", () => {
         setIsConnected(true);
-        localStorage.setItem('buzzerBrokerUrl', connectBrokerRef.current);
-        
+        localStorage.setItem("buzzerBrokerUrl", connectBrokerRef.current);
+
         // Initialize 5 buzzers with saved names and scores
         const savedNames = loadBuzzerNames();
         const savedScores = loadBuzzerScores();
@@ -76,37 +84,37 @@ export const useMQTT = () => {
           initialBuzzers.set(i, {
             id: i,
             name: savedNames[i] || `Buzzer ${i}`,
-            state: 'waiting',
+            state: "waiting",
             locked: false,
             score: savedScores[i] || 0,
           });
         }
         setBuzzers(initialBuzzers);
-        
-        mqttClient.subscribe('buzzer/pressed', (err) => {
+
+        mqttClient.subscribe("buzzer/pressed", (err) => {
           if (err) {
-            toast.error('Failed to subscribe to topic');
-            console.error('Subscribe error:', err);
+            toast.error("Failed to subscribe to topic");
+            console.error("Subscribe error:", err);
           } else {
-            toast.success('Connected to MQTT broker');
+            toast.success("Connected to MQTT broker");
           }
         });
       });
 
-      mqttClient.on('error', (err) => {
+      mqttClient.on("error", (err) => {
         toast.error(`Connection error: ${err.message}`);
-        console.error('MQTT Error:', err);
+        console.error("MQTT Error:", err);
       });
 
-      mqttClient.on('message', (receivedTopic, message) => {
+      mqttClient.on("message", (receivedTopic, message) => {
         try {
           const raw = message.toString();
-          console.log('[MQTT] Message received:', receivedTopic, 'raw:', raw);
-          if (receivedTopic === 'buzzer/pressed') {
+          console.log("[MQTT] Message received:", receivedTopic, "raw:", raw);
+          if (receivedTopic === "buzzer/pressed") {
             const data = JSON.parse(raw);
             const buzzerId = data.pressed;
-            console.log('[MQTT] Parsed buzzerId:', buzzerId);
-            if (typeof buzzerId === 'number' && buzzerId >= 1 && buzzerId <= 5) {
+            console.log("[MQTT] Parsed buzzerId:", buzzerId);
+            if (typeof buzzerId === "number" && buzzerId >= 1 && buzzerId <= 5) {
               setPressedBuzzerId(buzzerId);
               toast.success(`Buzzer ${buzzerId} pressed!`);
             } else if (buzzerId === 0) {
@@ -114,19 +122,19 @@ export const useMQTT = () => {
             }
           }
         } catch (err) {
-          console.error('Error parsing MQTT message:', err);
+          console.error("Error parsing MQTT message:", err);
         }
       });
 
-      mqttClient.on('close', () => {
+      mqttClient.on("close", () => {
         setIsConnected(false);
-        toast.info('Disconnected from MQTT broker');
+        toast.info("Disconnected from MQTT broker");
       });
 
       setClient(mqttClient);
     } catch (err) {
-      toast.error('Failed to connect to MQTT broker');
-      console.error('Connection error:', err);
+      toast.error("Failed to connect to MQTT broker");
+      console.error("Connection error:", err);
     }
   }, []);
 
@@ -140,73 +148,74 @@ export const useMQTT = () => {
 
   const reset = useCallback(() => {
     if (client && isConnected) {
-      client.publish('buzzer/control', JSON.stringify({ release: "" }));
-      client.publish('buzzer/pressed', JSON.stringify({ pressed: 0 }), { retain: true });
+      client.publish("buzzer/control", JSON.stringify({ release: "" }));
+      client.publish("buzzer/control", JSON.stringify({ unlock: [] }));
+      client.publish("buzzer/pressed", JSON.stringify({ pressed: 0 }), { retain: true });
       // Unlock all locked buzzers
       const lockedIds: number[] = [];
       buzzers.forEach((buzzer) => {
         if (buzzer.locked) lockedIds.push(buzzer.id);
       });
       if (lockedIds.length > 0) {
-        client.publish('buzzer/control', JSON.stringify({ unlock: lockedIds }));
+        client.publish("buzzer/control", JSON.stringify({ unlock: lockedIds }));
       }
-      setBuzzers(prev => {
+      setBuzzers((prev) => {
         const updated = new Map(prev);
         updated.forEach((buzzer, id) => {
-          updated.set(id, { ...buzzer, locked: false, state: 'waiting', pressedAt: undefined });
+          updated.set(id, { ...buzzer, locked: false, state: "waiting", pressedAt: undefined });
         });
         return updated;
       });
       setPressedBuzzerId(null);
-      toast.success('Buzzers reset');
+      toast.success("Buzzers reset");
     }
   }, [client, isConnected, buzzers]);
 
   const handleCorrect = useCallback(() => {
     if (client && isConnected) {
       // Release all buzzers
-      client.publish('buzzer/control', JSON.stringify({ release: "" }));
-      client.publish('buzzer/pressed', JSON.stringify({ pressed: 0 }), { retain: true });
+      client.publish("buzzer/control", JSON.stringify({ release: "" }));
+      client.publish("buzzer/pressed", JSON.stringify({ pressed: 0 }), { retain: true });
       // Unlock all locked buzzers
       const lockedIds: number[] = [];
       buzzers.forEach((buzzer) => {
         if (buzzer.locked) lockedIds.push(buzzer.id);
       });
       if (lockedIds.length > 0) {
-        client.publish('buzzer/control', JSON.stringify({ unlock: lockedIds }));
+        client.publish("buzzer/control", JSON.stringify({ unlock: lockedIds }));
       }
       // Update local state - add points to the pressed buzzer
-      setBuzzers(prev => {
+      setBuzzers((prev) => {
         const updated = new Map(prev);
         const scores: Record<number, number> = {};
         updated.forEach((buzzer, id) => {
           const newScore = id === pressedBuzzerId ? buzzer.score + pointValue : buzzer.score;
-          updated.set(id, { ...buzzer, locked: false, state: 'waiting', pressedAt: undefined, score: newScore });
+          updated.set(id, { ...buzzer, locked: false, state: "waiting", pressedAt: undefined, score: newScore });
           scores[id] = newScore;
         });
         saveBuzzerScores(scores);
         return updated;
       });
       setPressedBuzzerId(null);
-      toast.success('Bonne réponse ! Buzzers libérés');
+      toast.success("Bonne réponse ! Buzzers libérés");
     }
   }, [client, isConnected, buzzers, pressedBuzzerId, pointValue, saveBuzzerScores]);
 
   const handleWrong = useCallback(() => {
     if (client && isConnected && pressedBuzzerId !== null) {
       // Lock the buzzer that had the hand
-      client.publish('buzzer/control', JSON.stringify({ lock: [pressedBuzzerId] }));
+      client.publish("buzzer/control", JSON.stringify({ lock: [pressedBuzzerId] }));
       // Release all buzzers
-      client.publish('buzzer/control', JSON.stringify({ release: "" }));
-      client.publish('buzzer/pressed', JSON.stringify({ pressed: 0 }), { retain: true });
+      client.publish("buzzer/control", JSON.stringify({ release: "" }));
+      client.publish("buzzer/pressed", JSON.stringify({ pressed: 0 }), { retain: true });
       // Update local state
-      setBuzzers(prev => {
+      setBuzzers((prev) => {
         const updated = new Map(prev);
         updated.forEach((buzzer, id) => {
           if (id === pressedBuzzerId) {
-            updated.set(id, { ...buzzer, locked: true, state: 'waiting', pressedAt: undefined });
+            updated.set(id, { ...buzzer, locked: true, state: "waiting", pressedAt: undefined });
           } else {
-            updated.set(id, { ...buzzer, state: 'waiting', pressedAt: undefined });
+            updated.set(id, { ...buzzer, state: "waiting", pressedAt: undefined });
           }
         });
         return updated;
@@ -217,38 +226,44 @@ export const useMQTT = () => {
     }
   }, [client, isConnected, pressedBuzzerId, buzzers]);
 
-  const renameBuzzer = useCallback((id: number, newName: string) => {
-    setBuzzers(prev => {
-      const updated = new Map(prev);
-      const buzzer = updated.get(id);
-      if (buzzer) {
-        updated.set(id, { ...buzzer, name: newName });
-      }
-      return updated;
-    });
-
-    const names = loadBuzzerNames();
-    names[id] = newName;
-    saveBuzzerNames(names);
-  }, [loadBuzzerNames, saveBuzzerNames]);
-
-  const toggleLock = useCallback((id: number) => {
-    setBuzzers(prev => {
-      const updated = new Map(prev);
-      const buzzer = updated.get(id);
-      if (buzzer && client && isConnected) {
-        const newLocked = !buzzer.locked;
-        updated.set(id, { ...buzzer, locked: newLocked });
-        const topic = 'buzzer/control';
-        if (newLocked) {
-          client.publish(topic, JSON.stringify({ lock: [id] }));
-        } else {
-          client.publish(topic, JSON.stringify({ unlock: [id] }));
+  const renameBuzzer = useCallback(
+    (id: number, newName: string) => {
+      setBuzzers((prev) => {
+        const updated = new Map(prev);
+        const buzzer = updated.get(id);
+        if (buzzer) {
+          updated.set(id, { ...buzzer, name: newName });
         }
-      }
-      return updated;
-    });
-  }, [client, isConnected]);
+        return updated;
+      });
+
+      const names = loadBuzzerNames();
+      names[id] = newName;
+      saveBuzzerNames(names);
+    },
+    [loadBuzzerNames, saveBuzzerNames],
+  );
+
+  const toggleLock = useCallback(
+    (id: number) => {
+      setBuzzers((prev) => {
+        const updated = new Map(prev);
+        const buzzer = updated.get(id);
+        if (buzzer && client && isConnected) {
+          const newLocked = !buzzer.locked;
+          updated.set(id, { ...buzzer, locked: newLocked });
+          const topic = "buzzer/control";
+          if (newLocked) {
+            client.publish(topic, JSON.stringify({ lock: [id] }));
+          } else {
+            client.publish(topic, JSON.stringify({ unlock: [id] }));
+          }
+        }
+        return updated;
+      });
+    },
+    [client, isConnected],
+  );
 
   useEffect(() => {
     return () => {
@@ -260,15 +275,15 @@ export const useMQTT = () => {
 
   // Update buzzer states based on pressed buzzer
   useEffect(() => {
-    setBuzzers(prev => {
+    setBuzzers((prev) => {
       const updated = new Map(prev);
       updated.forEach((buzzer, id) => {
         if (pressedBuzzerId === null) {
-          updated.set(id, { ...buzzer, state: 'waiting', pressedAt: undefined });
+          updated.set(id, { ...buzzer, state: "waiting", pressedAt: undefined });
         } else if (id === pressedBuzzerId) {
-          updated.set(id, { ...buzzer, state: 'pressed', pressedAt: new Date() });
+          updated.set(id, { ...buzzer, state: "pressed", pressedAt: new Date() });
         } else {
-          updated.set(id, { ...buzzer, state: 'blocked' });
+          updated.set(id, { ...buzzer, state: "blocked" });
         }
       });
       return updated;
@@ -277,32 +292,32 @@ export const useMQTT = () => {
 
   const updatePointValue = useCallback((value: number) => {
     setPointValue(value);
-    localStorage.setItem('buzzerPointValue', String(value));
+    localStorage.setItem("buzzerPointValue", String(value));
   }, []);
 
   const resetScores = useCallback(() => {
-    setBuzzers(prev => {
+    setBuzzers((prev) => {
       const updated = new Map(prev);
       updated.forEach((buzzer, id) => {
         updated.set(id, { ...buzzer, score: 0 });
       });
       return updated;
     });
-    localStorage.removeItem('buzzerScores');
-    toast.success('Scores remis à zéro');
+    localStorage.removeItem("buzzerScores");
+    toast.success("Scores remis à zéro");
   }, []);
 
   const lockAll = useCallback(() => {
     if (client && isConnected) {
-      client.publish('buzzer/control', JSON.stringify({ lock: [] }));
-      setBuzzers(prev => {
+      client.publish("buzzer/control", JSON.stringify({ lock: [] }));
+      setBuzzers((prev) => {
         const updated = new Map(prev);
         updated.forEach((buzzer, id) => {
           updated.set(id, { ...buzzer, locked: true });
         });
         return updated;
       });
-      toast.success('Tous les buzzers verrouillés');
+      toast.success("Tous les buzzers verrouillés");
     }
   }, [client, isConnected]);
 
