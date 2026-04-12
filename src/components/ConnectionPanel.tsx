@@ -13,7 +13,7 @@ interface ConnectionPanelProps {
 }
 
 export const ConnectionPanel = ({ isConnected, onConnect, onDisconnect }: ConnectionPanelProps) => {
-  const [broker, setBroker] = useState("ws://localhost:9001/");
+  const [broker, setBroker] = useState(() => localStorage.getItem('buzzerBrokerUrl') || "ws://localhost:9001/");
   const [topic, setTopic] = useState("buzzers/#");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");

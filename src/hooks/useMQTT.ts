@@ -47,7 +47,10 @@ export const useMQTT = () => {
     localStorage.setItem('buzzerScores', JSON.stringify(scores));
   }, []);
 
+  const connectBrokerRef = useRef('');
+
   const connect = useCallback((broker: string, topic: string, username?: string, password?: string) => {
+    connectBrokerRef.current = broker;
     try {
       const options: mqtt.IClientOptions = {
         clean: true,
@@ -63,6 +66,7 @@ export const useMQTT = () => {
       
       mqttClient.on('connect', () => {
         setIsConnected(true);
+        localStorage.setItem('buzzerBrokerUrl', connectBrokerRef.current);
         
         // Initialize 5 buzzers with saved names and scores
         const savedNames = loadBuzzerNames();
