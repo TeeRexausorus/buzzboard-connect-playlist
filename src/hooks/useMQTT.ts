@@ -294,7 +294,7 @@ export const useMQTT = () => {
 
   const lockAll = useCallback(() => {
     if (client && isConnected) {
-      client.publish('buzzer/control', JSON.stringify({ lock: "" }));
+      client.publish('buzzer/control', JSON.stringify({ lock: [] }));
       setBuzzers(prev => {
         const updated = new Map(prev);
         updated.forEach((buzzer, id) => {
