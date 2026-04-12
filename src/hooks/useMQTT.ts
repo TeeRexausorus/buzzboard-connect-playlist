@@ -292,6 +292,20 @@ export const useMQTT = () => {
     toast.success('Scores remis à zéro');
   }, []);
 
+  const lockAll = useCallback(() => {
+    if (client && isConnected) {
+      client.publish('buzzer/control', JSON.stringify({ lock: "" }));
+      setBuzzers(prev => {
+        const updated = new Map(prev);
+        updated.forEach((buzzer, id) => {
+          updated.set(id, { ...buzzer, locked: true });
+        });
+        return updated;
+      });
+      toast.success('Tous les buzzers verrouillés');
+    }
+  }, [client, isConnected]);
+
   return {
     isConnected,
     buzzers,
@@ -306,5 +320,6 @@ export const useMQTT = () => {
     handleWrong,
     updatePointValue,
     resetScores,
+    lockAll,
   };
 };
