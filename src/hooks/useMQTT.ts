@@ -320,5 +320,6 @@ export const useMQTT = () => {
     handleWrong,
     updatePointValue,
     resetScores,
+    lockAll,
   };
 };

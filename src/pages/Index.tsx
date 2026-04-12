@@ -6,11 +6,11 @@ import { Card } from "@/components/ui/card";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { BuzzerCard } from "@/components/BuzzerCard";
 import { useMQTT } from "@/hooks/useMQTT";
-import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy } from "lucide-react";
+import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Index = () => {
-  const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores } = useMQTT();
+  const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores, lockAll } = useMQTT();
   const [showConfig, setShowConfig] = useState(false);
 
   const buzzerList = Array.from(buzzers.values());
@@ -80,6 +80,14 @@ const Index = () => {
             >
               <RotateCcw className="w-4 h-4 mr-2" />
               Reset All Buzzers
+            </Button>
+            <Button
+              onClick={lockAll}
+              variant="outline"
+              className="bg-card border-border hover:bg-muted text-foreground font-semibold"
+            >
+              <Lock className="w-4 h-4 mr-2" />
+              Lock All
             </Button>
             <Button
               onClick={() => setShowConfig(!showConfig)}
