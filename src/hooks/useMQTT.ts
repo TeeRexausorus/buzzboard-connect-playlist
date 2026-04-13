@@ -321,6 +321,13 @@ export const useMQTT = () => {
     }
   }, [client, isConnected]);
 
+  const publishConfig = useCallback((key: string, value: unknown) => {
+    if (client && isConnected) {
+      client.publish("buzzer/config", JSON.stringify({ [key]: value }));
+      toast.success(`Config "${key}" envoyée`);
+    }
+  }, [client, isConnected]);
+
   return {
     isConnected,
     buzzers,
@@ -336,5 +343,6 @@ export const useMQTT = () => {
     updatePointValue,
     resetScores,
     lockAll,
+    publishConfig,
   };
 };
