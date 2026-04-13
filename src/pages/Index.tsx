@@ -3,15 +3,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { BuzzerCard } from "@/components/BuzzerCard";
 import { useMQTT } from "@/hooks/useMQTT";
-import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock } from "lucide-react";
+import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, Send } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Index = () => {
-  const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores, lockAll } = useMQTT();
+  const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores, lockAll, publishConfig } = useMQTT();
   const [showConfig, setShowConfig] = useState(false);
+
+  // LED config state
+  const [blockedColor, setBlockedColor] = useState({ r: 255, g: 0, b: 0 });
+  const [validColor, setValidColor] = useState({ r: 0, g: 255, b: 0 });
+  const [idleRainbow, setIdleRainbow] = useState(true);
+  const [idleColor, setIdleColor] = useState({ r: 0, g: 0, b: 255 });
 
   const buzzerList = Array.from(buzzers.values());
 
