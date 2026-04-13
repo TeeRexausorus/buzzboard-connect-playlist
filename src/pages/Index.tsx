@@ -114,7 +114,8 @@ const Index = () => {
             animate={{ opacity: 1, height: 'auto' }}
             transition={{ duration: 0.3 }}
           >
-            <Card className="p-4 bg-card/50 border-border/50 backdrop-blur-sm">
+            <Card className="p-4 bg-card/50 border-border/50 backdrop-blur-sm space-y-6">
+              {/* Points */}
               <div className="flex flex-wrap items-end gap-4">
                 <div>
                   <Label htmlFor="pointValue" className="text-sm text-foreground">Valeur d'un point</Label>
@@ -135,6 +136,73 @@ const Index = () => {
                   <Trophy className="w-4 h-4 mr-2" />
                   RAZ Scores
                 </Button>
+              </div>
+
+              {/* LED Config */}
+              <div className="border-t border-border pt-4 space-y-4">
+                <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Palette className="w-4 h-4" />
+                  Configuration LEDs
+                </h4>
+
+                {/* Blocked Color */}
+                <div className="flex flex-wrap items-end gap-3">
+                  <Label className="text-sm text-muted-foreground w-full">Couleur bloqué (blocked_color)</Label>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">R</Label>
+                    <Input type="number" min={0} max={255} value={blockedColor.r} onChange={(e) => setBlockedColor(p => ({ ...p, r: Math.min(255, Math.max(0, parseInt(e.target.value) || 0)) }))} className="w-16 bg-input border-border text-foreground" />
+                    <Label className="text-xs text-muted-foreground">V</Label>
+                    <Input type="number" min={0} max={255} value={blockedColor.g} onChange={(e) => setBlockedColor(p => ({ ...p, g: Math.min(255, Math.max(0, parseInt(e.target.value) || 0)) }))} className="w-16 bg-input border-border text-foreground" />
+                    <Label className="text-xs text-muted-foreground">B</Label>
+                    <Input type="number" min={0} max={255} value={blockedColor.b} onChange={(e) => setBlockedColor(p => ({ ...p, b: Math.min(255, Math.max(0, parseInt(e.target.value) || 0)) }))} className="w-16 bg-input border-border text-foreground" />
+                    <div className="w-8 h-8 rounded border border-border" style={{ backgroundColor: `rgb(${blockedColor.r}, ${blockedColor.g}, ${blockedColor.b})` }} />
+                    <Button size="sm" variant="outline" onClick={() => publishConfig("blocked_color", [blockedColor.r, blockedColor.g, blockedColor.b])} className="bg-card border-border hover:bg-muted text-foreground">
+                      <Send className="w-3 h-3 mr-1" /> Envoyer
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Valid Color */}
+                <div className="flex flex-wrap items-end gap-3">
+                  <Label className="text-sm text-muted-foreground w-full">Couleur validé (valid_color)</Label>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">R</Label>
+                    <Input type="number" min={0} max={255} value={validColor.r} onChange={(e) => setValidColor(p => ({ ...p, r: Math.min(255, Math.max(0, parseInt(e.target.value) || 0)) }))} className="w-16 bg-input border-border text-foreground" />
+                    <Label className="text-xs text-muted-foreground">V</Label>
+                    <Input type="number" min={0} max={255} value={validColor.g} onChange={(e) => setValidColor(p => ({ ...p, g: Math.min(255, Math.max(0, parseInt(e.target.value) || 0)) }))} className="w-16 bg-input border-border text-foreground" />
+                    <Label className="text-xs text-muted-foreground">B</Label>
+                    <Input type="number" min={0} max={255} value={validColor.b} onChange={(e) => setValidColor(p => ({ ...p, b: Math.min(255, Math.max(0, parseInt(e.target.value) || 0)) }))} className="w-16 bg-input border-border text-foreground" />
+                    <div className="w-8 h-8 rounded border border-border" style={{ backgroundColor: `rgb(${validColor.r}, ${validColor.g}, ${validColor.b})` }} />
+                    <Button size="sm" variant="outline" onClick={() => publishConfig("valid_color", [validColor.r, validColor.g, validColor.b])} className="bg-card border-border hover:bg-muted text-foreground">
+                      <Send className="w-3 h-3 mr-1" /> Envoyer
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Idle */}
+                <div className="flex flex-wrap items-end gap-3">
+                  <Label className="text-sm text-muted-foreground w-full">Idle (rainbow ou couleur fixe)</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Switch checked={idleRainbow} onCheckedChange={setIdleRainbow} />
+                      <Label className="text-xs text-muted-foreground">Rainbow</Label>
+                    </div>
+                    {!idleRainbow && (
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-muted-foreground">R</Label>
+                        <Input type="number" min={0} max={255} value={idleColor.r} onChange={(e) => setIdleColor(p => ({ ...p, r: Math.min(255, Math.max(0, parseInt(e.target.value) || 0)) }))} className="w-16 bg-input border-border text-foreground" />
+                        <Label className="text-xs text-muted-foreground">V</Label>
+                        <Input type="number" min={0} max={255} value={idleColor.g} onChange={(e) => setIdleColor(p => ({ ...p, g: Math.min(255, Math.max(0, parseInt(e.target.value) || 0)) }))} className="w-16 bg-input border-border text-foreground" />
+                        <Label className="text-xs text-muted-foreground">B</Label>
+                        <Input type="number" min={0} max={255} value={idleColor.b} onChange={(e) => setIdleColor(p => ({ ...p, b: Math.min(255, Math.max(0, parseInt(e.target.value) || 0)) }))} className="w-16 bg-input border-border text-foreground" />
+                        <div className="w-8 h-8 rounded border border-border" style={{ backgroundColor: `rgb(${idleColor.r}, ${idleColor.g}, ${idleColor.b})` }} />
+                      </div>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => publishConfig("idle", idleRainbow ? true : [idleColor.r, idleColor.g, idleColor.b])} className="bg-card border-border hover:bg-muted text-foreground">
+                      <Send className="w-3 h-3 mr-1" /> Envoyer
+                    </Button>
+                  </div>
+                </div>
               </div>
             </Card>
           </motion.div>
