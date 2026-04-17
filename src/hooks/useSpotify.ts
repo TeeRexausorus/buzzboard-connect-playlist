@@ -29,6 +29,14 @@ export interface SpotifyTrack {
   };
 }
 
+export interface SpotifyPlaylist {
+  id: string;
+  name: string;
+  images: { url: string }[];
+  tracks: { total: number };
+  owner: { display_name: string };
+}
+
 // ---------- PKCE helpers ----------
 const base64url = (bytes: ArrayBuffer) => {
   const bin = String.fromCharCode(...new Uint8Array(bytes));
