@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { BuzzerCard } from "@/components/BuzzerCard";
-import { BlindTestPanel } from "@/components/BlindTestPanel";
+import { BlindTestPlayer } from "@/components/BlindTestPlayer";
+import { SpotifyConfigPanel } from "@/components/SpotifyConfigPanel";
 import { useMQTT } from "@/hooks/useMQTT";
 import { useSpotify } from "@/hooks/useSpotify";
 import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, Send } from "lucide-react";
@@ -78,6 +79,7 @@ const Index = () => {
             isConnected={isConnected}
             onConnect={connect}
             onDisconnect={disconnect}
+            extraConfig={<SpotifyConfigPanel {...spotify} />}
           />
         </motion.div>
 
@@ -233,14 +235,16 @@ const Index = () => {
           </motion.div>
         )}
 
-        {/* Blind Test Panel — toujours visible pour permettre la config Spotify */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          <BlindTestPanel {...spotify} />
-        </motion.div>
+        {/* Blind Test Player — visible une fois MQTT connecté ET Spotify authentifié */}
+        {isConnected && spotify.isAuthed && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <BlindTestPlayer {...spotify} />
+          </motion.div>
+        )}
 
         {/* Buzzers Grid */}
         {buzzerList.length > 0 ? (
