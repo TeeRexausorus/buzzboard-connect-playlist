@@ -58,6 +58,16 @@ export const useMQTT = () => {
   const connectBrokerRef = useRef("");
 
   const connect = useCallback((broker: string, topic: string, username?: string, password?: string) => {
+    if (typeof window !== "undefined") {
+      const pageProto = window.location.protocol;
+      if (pageProto === "https:" && broker.startsWith("ws://")) {
+        toast.error("UI en HTTPS : le broker doit être en wss://. Sers l'UI en HTTP ou utilise un broker WSS.");
+        return;
+      }
+      if (pageProto === "http:" && broker.startsWith("wss://")) {
+        toast.info("UI en HTTP avec broker WSS : ça peut marcher mais l'inverse est bloqué par le navigateur.");
+      }
+    }
     connectBrokerRef.current = broker;
     try {
       const options: mqtt.IClientOptions = {
