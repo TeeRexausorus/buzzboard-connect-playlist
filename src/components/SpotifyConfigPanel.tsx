@@ -86,9 +86,9 @@ export const SpotifyConfigPanel = ({
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                💡 Raspberry Pi mobile : utilise un hostname mDNS stable type{" "}
-                <code className="text-primary">http://buzzer.local:PORT/</code> (au lieu de l'IP) pour une seule URI
-                valable sur tous les réseaux.
+                💡 Pour usage local : sers l'UI en HTTP et déclare{" "}
+                <code className="text-primary">http://127.0.0.1:PORT/</code> comme redirect URI Spotify (loopback
+                autorisé sans HTTPS).
               </p>
             </div>
           </div>
