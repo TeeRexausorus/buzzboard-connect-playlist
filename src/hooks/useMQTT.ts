@@ -307,6 +307,20 @@ export const useMQTT = () => {
     toast.success("Scores remis à zéro");
   }, []);
 
+  const adjustScore = useCallback((id: number, delta: number) => {
+    setBuzzers((prev) => {
+      const updated = new Map(prev);
+      const b = updated.get(id);
+      if (!b) return prev;
+      const newScore = b.score + delta;
+      updated.set(id, { ...b, score: newScore });
+      const scores: Record<number, number> = {};
+      updated.forEach((bb, bid) => { scores[bid] = bb.score; });
+      saveBuzzerScores(scores);
+      return updated;
+    });
+  }, [saveBuzzerScores]);
+
   const lockAll = useCallback(() => {
     if (client && isConnected) {
       client.publish("buzzer/control", JSON.stringify({ lock: [] }));
@@ -342,6 +356,7 @@ export const useMQTT = () => {
     handleWrong,
     updatePointValue,
     resetScores,
+    adjustScore,
     lockAll,
     publishConfig,
   };

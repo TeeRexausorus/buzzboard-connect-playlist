@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Pencil, Check, X, Lock, Unlock, Trophy } from "lucide-react";
+import { Pencil, Check, X, Lock, Unlock, Trophy, Plus, Minus } from "lucide-react";
 
 interface BuzzerCardProps {
   id: number;
@@ -15,9 +15,10 @@ interface BuzzerCardProps {
   score: number;
   onRename?: (id: number, newName: string) => void;
   onToggleLock?: (id: number) => void;
+  onAdjustScore?: (id: number, delta: number) => void;
 }
 
-export const BuzzerCard = ({ id, name, state, pressedAt, locked, score, onRename, onToggleLock }: BuzzerCardProps) => {
+export const BuzzerCard = ({ id, name, state, pressedAt, locked, score, onRename, onToggleLock, onAdjustScore }: BuzzerCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
   
@@ -136,6 +137,26 @@ export const BuzzerCard = ({ id, name, state, pressedAt, locked, score, onRename
             <Trophy className="w-5 h-5 text-yellow-400" />
             <span className="text-2xl font-display font-bold text-foreground">{score}</span>
             <span className="text-sm text-muted-foreground">pts</span>
+            <div className="ml-auto flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => onAdjustScore?.(id, -1)}
+                className="h-7 w-7 bg-card border-border hover:bg-muted"
+                title="Retirer un point"
+              >
+                <Minus className="w-3 h-3" />
+              </Button>
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => onAdjustScore?.(id, 1)}
+                className="h-7 w-7 bg-card border-border hover:bg-muted"
+                title="Ajouter un point"
+              >
+                <Plus className="w-3 h-3" />
+              </Button>
+            </div>
           </div>
           
           {state === 'pressed' && pressedAt && (
