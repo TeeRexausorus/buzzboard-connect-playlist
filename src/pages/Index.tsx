@@ -233,16 +233,14 @@ const Index = () => {
           </motion.div>
         )}
 
-        {/* Blind Test Panel */}
-        {isConnected && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <BlindTestPanel {...spotify} />
-          </motion.div>
-        )}
+        {/* Blind Test Panel — toujours visible pour permettre la config Spotify */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <BlindTestPanel {...spotify} />
+        </motion.div>
 
         {/* Buzzers Grid */}
         {buzzerList.length > 0 ? (
