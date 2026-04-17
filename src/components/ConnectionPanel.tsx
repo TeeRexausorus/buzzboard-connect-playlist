@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,10 @@ interface ConnectionPanelProps {
   isConnected: boolean;
   onConnect: (broker: string, topic: string, username?: string, password?: string) => void;
   onDisconnect: () => void;
+  extraConfig?: ReactNode;
 }
 
-export const ConnectionPanel = ({ isConnected, onConnect, onDisconnect }: ConnectionPanelProps) => {
+export const ConnectionPanel = ({ isConnected, onConnect, onDisconnect, extraConfig }: ConnectionPanelProps) => {
   const [broker, setBroker] = useState(() => localStorage.getItem('buzzerBrokerUrl') || "ws://localhost:9001/");
   const [topic, setTopic] = useState("buzzers/#");
   const [username, setUsername] = useState("");
@@ -49,66 +50,74 @@ export const ConnectionPanel = ({ isConnected, onConnect, onDisconnect }: Connec
           >
             {isConnected ? "Déconnecter" : "Connecter"}
           </Button>
-          {!isConnected && (
-            <Button
-              onClick={() => setIsExpanded(!isExpanded)}
-              size="sm"
-              variant="ghost"
-            >
-              {isExpanded ? "Réduire" : "Configurer"}
-            </Button>
-          )}
+          <Button
+            onClick={() => setIsExpanded(!isExpanded)}
+            size="sm"
+            variant="ghost"
+          >
+            {isExpanded ? "Réduire" : "Configurer"}
+          </Button>
         </div>
       </div>
 
-      {isExpanded && !isConnected && (
+      {isExpanded && (
         <div className="space-y-3 mt-4 pt-4 border-t border-border">
-          <div>
-            <Label htmlFor="broker" className="text-sm text-foreground">Broker URL</Label>
-            <Input
-              id="broker"
-              value={broker}
-              onChange={(e) => setBroker(e.target.value)}
-              placeholder="wss://broker.example.com:8081"
-              className="bg-input border-border text-foreground mt-1"
-            />
-          </div>
+          {!isConnected && (
+            <>
+              <div>
+                <Label htmlFor="broker" className="text-sm text-foreground">Broker URL</Label>
+                <Input
+                  id="broker"
+                  value={broker}
+                  onChange={(e) => setBroker(e.target.value)}
+                  placeholder="wss://broker.example.com:8081"
+                  className="bg-input border-border text-foreground mt-1"
+                />
+              </div>
 
-          <div>
-            <Label htmlFor="topic" className="text-sm text-foreground">Topic</Label>
-            <Input
-              id="topic"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="buzzers/#"
-              className="bg-input border-border text-foreground mt-1"
-            />
-          </div>
+              <div>
+                <Label htmlFor="topic" className="text-sm text-foreground">Topic</Label>
+                <Input
+                  id="topic"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="buzzers/#"
+                  className="bg-input border-border text-foreground mt-1"
+                />
+              </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="username" className="text-sm text-foreground">Username</Label>
-              <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="username"
-                className="bg-input border-border text-foreground mt-1"
-              />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="username" className="text-sm text-foreground">Username</Label>
+                  <Input
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="username"
+                    className="bg-input border-border text-foreground mt-1"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="password" className="text-sm text-foreground">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="password"
+                    className="bg-input border-border text-foreground mt-1"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {extraConfig && (
+            <div className={!isConnected ? "border-t border-border pt-4" : ""}>
+              {extraConfig}
             </div>
-
-            <div>
-              <Label htmlFor="password" className="text-sm text-foreground">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="password"
-                className="bg-input border-border text-foreground mt-1"
-              />
-            </div>
-          </div>
+          )}
         </div>
       )}
     </Card>
