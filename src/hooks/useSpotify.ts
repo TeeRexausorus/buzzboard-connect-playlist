@@ -4,7 +4,7 @@ import { toast } from "@/hooks/use-toast";
 const AUTH_STORAGE_KEY = "spotifyAuth";
 const CLIENT_ID_STORAGE_KEY = "spotifyClientId";
 const VERIFIER_STORAGE_KEY = "spotifyCodeVerifier";
-const SCOPES = "user-read-playback-state user-modify-playback-state";
+const SCOPES = "user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative";
 
 interface SpotifyAuth {
   access_token: string;
