@@ -144,6 +144,15 @@ const Index = () => {
               <Settings className="w-4 h-4 mr-2" />
               Config
             </Button>
+            {spotify.isAuthed && (
+              <div className="flex items-center gap-2 px-3 rounded-md border border-border bg-card">
+                <Music className="w-4 h-4 text-primary" />
+                <Label htmlFor="blindTestMode" className="text-sm text-foreground font-semibold cursor-pointer">
+                  Mode Blind Test
+                </Label>
+                <Switch id="blindTestMode" checked={blindTestMode} onCheckedChange={setBlindTestMode} />
+              </div>
+            )}
           </motion.div>
         )}
 
