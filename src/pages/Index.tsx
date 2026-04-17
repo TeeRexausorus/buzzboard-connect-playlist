@@ -14,7 +14,7 @@ import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, 
 import { motion } from "framer-motion";
 
 const Index = () => {
-  const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores, lockAll, publishConfig } = useMQTT();
+  const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores, adjustScore, lockAll, publishConfig } = useMQTT();
   const spotify = useSpotify();
   const [showConfig, setShowConfig] = useState(false);
   const [blindTestMode, setBlindTestMode] = useState(false);
