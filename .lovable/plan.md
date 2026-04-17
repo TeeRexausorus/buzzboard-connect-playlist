@@ -1,56 +1,47 @@
 
 
-## Le problème
+## Décision retenue
 
-Spotify exige des Redirect URIs **exactes** dans le dashboard de l'app : pas de wildcards (`*`), pas de plages IP, pas de `0.0.0.0`. Or sur ton réseau local, le Pi aura `192.168.1.42` chez toi, `192.168.0.17` chez un pote, `10.0.0.5` au bureau…
+UI servie en **HTTP** depuis le Pi (ou le PC portable), broker MQTT en **`ws://`** local. Pas de TLS, pas de tunnel, pas de prise de tête. Spotify reste utilisable car la redirect URI peut pointer vers `http://127.0.0.1:PORT/` côté loopback si besoin (ou on s'en passe en mobilité).
 
-Bonne nouvelle : Spotify accepte **plusieurs Redirect URIs** dans une même app, ET autorise `http://127.0.0.1` et `http://localhost` sans HTTPS. On peut s'en sortir proprement.
+## Ce que je propose de modifier
 
-## Solution recommandée : un hostname mDNS stable
+Trois petits ajustements code pour rendre ce setup robuste et rattraper les erreurs courantes :
 
-Au lieu de viser le Pi par son IP, on le vise par un **nom local** type `http://buzzer.local:8080`. Le Pi s'annonce sur le réseau via **Avahi/mDNS** (déjà inclus dans Raspberry Pi OS), et tous les appareils du LAN (mobile, PC, Mac) le résolvent automatiquement — **peu importe l'IP du moment**.
+### 1. Garde-fou mixed-content dans `useMQTT.ts`
+Avant de tenter `mqtt.connect()`, détecter le cas où l'UI est servie en HTTPS et l'URL broker commence par `ws://` (ou inversement, HTTP + wss qui marche mais qu'on signale). Afficher un toast clair plutôt que de laisser le navigateur planter en silence.
 
-Tu déclares **une seule** Redirect URI dans Spotify : `http://buzzer.local:8080/` → ça marche sur tous les réseaux, pour tous tes clients.
+```ts
+if (window.location.protocol === 'https:' && broker.startsWith('ws://')) {
+  toast.error("UI en HTTPS : le broker doit être en wss://. Sers l'UI en HTTP ou utilise un broker WSS.");
+  return;
+}
+```
 
-### Étapes côté Pi (config système, pas de code)
-1. `sudo raspi-config` → changer le hostname en `buzzer` (ou ce que tu veux).
-2. Vérifier qu'Avahi tourne : `sudo systemctl status avahi-daemon` (actif par défaut sur Raspberry Pi OS).
-3. Servir l'app sur un port fixe (ex: 8080) avec `vite preview --host --port 8080` ou via un Caddy/nginx.
-4. Tester depuis un autre appareil : `ping buzzer.local` doit répondre.
+### 2. URL broker par défaut adaptative dans `ConnectionPanel.tsx`
+Au lieu du hardcodé `ws://localhost:9001/`, calculer un défaut basé sur l'origine courante :
+- Si HTTP → `ws://<hostname>:9001/` (utilise le hostname courant, pratique sur le Pi)
+- Si HTTPS → `wss://<hostname>:9001/`
 
-### Côté Spotify Dashboard
-- Redirect URI à ajouter : `http://buzzer.local:8080/`
-- Spotify accepte les URIs `http://` uniquement pour `localhost`, `127.0.0.1` **et** les hostnames `.local` (mDNS). C'est documenté et stable.
+Toujours overridable par l'utilisateur, et toujours persisté en localStorage (comportement actuel conservé).
 
-### Côté code (changement minime)
-Actuellement `getRedirectUri()` retourne `window.location.origin + "/"`. Si tu accèdes au Pi via `http://buzzer.local:8080`, ça génère automatiquement `http://buzzer.local:8080/` → match parfait avec ce qui est déclaré chez Spotify. **Aucun changement de code nécessaire**, à condition de toujours taper `buzzer.local:8080` dans la barre d'adresse (jamais l'IP brute).
+### 3. Nettoyage SpotifyConfigPanel
+Retirer la mention `.local` ajoutée précédemment (devenue caduque) et la remplacer par une note courte : "Pour usage local : sers l'UI en HTTP et déclare `http://127.0.0.1:PORT/` comme redirect URI Spotify (loopback autorisé sans HTTPS)."
 
-## Plan B : si mDNS ne marche pas (certains Android, réseaux d'entreprise)
+## Ce que je ne touche pas
 
-Ajouter dans le dashboard Spotify **plusieurs Redirect URIs en parallèle** :
-- `http://buzzer.local:8080/`
-- `http://127.0.0.1:8080/` (si tu y accèdes parfois depuis le Pi lui-même)
-- `http://192.168.1.42:8080/`, `http://192.168.0.17:8080/`… (les IPs des réseaux que tu fréquentes)
+- Pas de changement protocole MQTT (toujours icicabuzz, topics inchangés).
+- Pas de changement scoring, buzzers, blind test.
+- Pas d'ajout de dépendance.
 
-Spotify accepte autant d'URIs qu'on veut. Inconvénient : à chaque nouveau réseau, faut éditer le dashboard une fois.
+## Mémoire à mettre à jour
 
-Pour rendre ça moins pénible côté UI, je peux **petit ajout de code optionnel** :
-- Dans `SpotifyConfigPanel`, afficher dynamiquement la Redirect URI actuelle (`window.location.origin + "/"`) avec un bouton "Copier", pour qu'au premier lancement sur un nouveau réseau tu puisses la coller en 2 secondes dans le dashboard Spotify.
+Ajouter une note dans `mem://mqtt/connection-details` : "Déploiement cible = HTTP local (Pi ou PC), broker en `ws://`. HTTPS interdit côté UI pour éviter mixed-content avec broker non-TLS."
 
-## Plan C : tunnel public (Tailscale / Cloudflare Tunnel)
+## Fichiers touchés
 
-Si tu veux **zéro config réseau** et un accès même hors LAN :
-- **Tailscale** : installe sur le Pi + tes appareils → ils se voient via une IP `100.x.x.x` stable, peu importe le réseau. Redirect URI = `http://buzzer-pi.tailnet-name.ts.net:8080/`. Gratuit perso.
-- **Cloudflare Tunnel** : expose le Pi sur un sous-domaine public HTTPS gratuit (`buzzer.tonnom.workers.dev`). Plus lourd à setup mais HTTPS natif.
-
-## Recommandation
-
-**Plan A (mDNS `buzzer.local`)** pour 90% des cas — robuste, sans code, sans dépendance externe. Plan B (afficher/copier l'URI) en complément UX si tu veux que je l'ajoute. Plan C uniquement si t'as besoin d'accès hors LAN.
-
-## Ce que je peux coder maintenant (si tu veux)
-
-1. Afficher la Redirect URI courante avec un bouton "Copier" dans `SpotifyConfigPanel` (utile pour Plan B).
-2. Ajouter une mini doc dans le panneau ("Pour Raspberry Pi : utilise `http://buzzer.local:PORT/`").
-
-Sinon, c'est purement de la config Pi + dashboard Spotify, pas besoin de toucher au code.
+- `src/hooks/useMQTT.ts` — garde-fou mixed-content
+- `src/components/ConnectionPanel.tsx` — défaut broker basé sur `window.location`
+- `src/components/SpotifyConfigPanel.tsx` — corriger la mini-doc
+- `mem://mqtt/connection-details` — noter la décision archi
 
