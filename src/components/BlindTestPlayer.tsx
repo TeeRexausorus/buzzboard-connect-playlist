@@ -3,16 +3,29 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Music, Search, Play, Pause, Eye, EyeOff } from "lucide-react";
-import type { SpotifyTrack } from "@/hooks/useSpotify";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Music, Search, Play, Pause, Eye, EyeOff, SkipForward, ListMusic, RefreshCw } from "lucide-react";
+import type { SpotifyTrack, SpotifyPlaylist } from "@/hooks/useSpotify";
 
 interface BlindTestPlayerProps {
   search: (q: string) => Promise<SpotifyTrack[]>;
-  playTrack: (t: SpotifyTrack) => void;
+  playTrack: (t: SpotifyTrack) => Promise<boolean> | void;
   pause: () => void;
   resume: () => void;
   currentTrack: SpotifyTrack | null;
   isAuthed: boolean;
+  playlists: SpotifyPlaylist[];
+  selectedPlaylistId: string;
+  selectPlaylist: (id: string) => void;
+  fetchPlaylists: () => void;
+  playlistQueueLength: number;
+  playNextFromPlaylist: () => Promise<boolean>;
 }
 
 export const BlindTestPlayer = ({
@@ -22,6 +35,12 @@ export const BlindTestPlayer = ({
   resume,
   currentTrack,
   isAuthed,
+  playlists,
+  selectedPlaylistId,
+  selectPlaylist,
+  fetchPlaylists,
+  playlistQueueLength,
+  playNextFromPlaylist,
 }: BlindTestPlayerProps) => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SpotifyTrack[]>([]);
