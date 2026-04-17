@@ -13,8 +13,15 @@ interface ConnectionPanelProps {
   extraConfig?: ReactNode;
 }
 
+const computeDefaultBroker = () => {
+  if (typeof window === "undefined") return "ws://localhost:9001/";
+  const proto = window.location.protocol === "https:" ? "wss" : "ws";
+  const host = window.location.hostname || "localhost";
+  return `${proto}://${host}:9001/`;
+};
+
 export const ConnectionPanel = ({ isConnected, onConnect, onDisconnect, extraConfig }: ConnectionPanelProps) => {
-  const [broker, setBroker] = useState(() => localStorage.getItem('buzzerBrokerUrl') || "ws://localhost:9001/");
+  const [broker, setBroker] = useState(() => localStorage.getItem('buzzerBrokerUrl') || computeDefaultBroker());
   const [topic, setTopic] = useState("buzzers/#");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
