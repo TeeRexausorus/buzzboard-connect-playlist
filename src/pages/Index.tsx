@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,13 +6,38 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { BuzzerCard } from "@/components/BuzzerCard";
+import { BlindTestPanel } from "@/components/BlindTestPanel";
 import { useMQTT } from "@/hooks/useMQTT";
+import { useSpotify } from "@/hooks/useSpotify";
 import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, Send } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Index = () => {
   const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores, lockAll, publishConfig } = useMQTT();
+  const spotify = useSpotify();
   const [showConfig, setShowConfig] = useState(false);
+
+  // Auto-pause Spotify when a buzzer is pressed
+  const prevPressedRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (pressedBuzzerId !== null && prevPressedRef.current === null && spotify.currentTrack) {
+      spotify.pause();
+    }
+    prevPressedRef.current = pressedBuzzerId;
+  }, [pressedBuzzerId, spotify]);
+
+  const onCorrect = () => {
+    handleCorrect();
+    if (spotify.currentTrack) spotify.pause();
+  };
+  const onWrong = () => {
+    handleWrong();
+    if (spotify.currentTrack) spotify.resume();
+  };
+  const onReset = () => {
+    reset();
+    if (spotify.currentTrack) spotify.pause();
+  };
 
   // LED config state
   const [blockedColor, setBlockedColor] = useState({ r: 255, g: 0, b: 0 });
@@ -65,7 +90,7 @@ const Index = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             <Button
-              onClick={handleCorrect}
+              onClick={onCorrect}
               disabled={pressedBuzzerId === null}
               className="bg-green-600 hover:bg-green-700 text-white font-semibold"
             >
@@ -73,7 +98,7 @@ const Index = () => {
               Correct
             </Button>
             <Button
-              onClick={handleWrong}
+              onClick={onWrong}
               disabled={pressedBuzzerId === null}
               className="bg-red-600 hover:bg-red-700 text-white font-semibold"
             >
@@ -81,7 +106,7 @@ const Index = () => {
               Faux
             </Button>
             <Button
-              onClick={reset}
+              onClick={onReset}
               variant="outline"
               className="bg-card border-border hover:bg-muted text-foreground font-semibold"
             >
@@ -205,6 +230,17 @@ const Index = () => {
                 </div>
               </div>
             </Card>
+          </motion.div>
+        )}
+
+        {/* Blind Test Panel */}
+        {isConnected && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <BlindTestPanel {...spotify} />
           </motion.div>
         )}
 
