@@ -17,18 +17,25 @@ const Index = () => {
   const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores, lockAll, publishConfig } = useMQTT();
   const spotify = useSpotify();
   const [showConfig, setShowConfig] = useState(false);
+  const [blindTestMode, setBlindTestMode] = useState(false);
 
-  // Auto-pause Spotify when a buzzer is pressed
+  // Auto-pause Spotify when a buzzer is pressed (only in blind test mode)
   const prevPressedRef = useRef<number | null>(null);
   useEffect(() => {
-    if (pressedBuzzerId !== null && prevPressedRef.current === null && spotify.currentTrack) {
+    if (
+      blindTestMode &&
+      pressedBuzzerId !== null &&
+      prevPressedRef.current === null &&
+      spotify.currentTrack
+    ) {
       spotify.pause();
     }
     prevPressedRef.current = pressedBuzzerId;
-  }, [pressedBuzzerId, spotify]);
+  }, [pressedBuzzerId, spotify, blindTestMode]);
 
   const onCorrect = async () => {
     handleCorrect();
+    if (!blindTestMode) return;
     if (spotify.selectedPlaylistId) {
       await spotify.playNextFromPlaylist();
     } else if (spotify.currentTrack) {
@@ -37,11 +44,11 @@ const Index = () => {
   };
   const onWrong = () => {
     handleWrong();
-    if (spotify.currentTrack) spotify.resume();
+    if (blindTestMode && spotify.currentTrack) spotify.resume();
   };
   const onReset = () => {
     reset();
-    if (spotify.currentTrack) spotify.pause();
+    if (blindTestMode && spotify.currentTrack) spotify.pause();
   };
 
   // LED config state
