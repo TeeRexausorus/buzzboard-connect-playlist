@@ -235,14 +235,16 @@ const Index = () => {
           </motion.div>
         )}
 
-        {/* Blind Test Panel — toujours visible pour permettre la config Spotify */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          <BlindTestPanel {...spotify} />
-        </motion.div>
+        {/* Blind Test Player — visible une fois MQTT connecté ET Spotify authentifié */}
+        {isConnected && spotify.isAuthed && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <BlindTestPlayer {...spotify} />
+          </motion.div>
+        )}
 
         {/* Buzzers Grid */}
         {buzzerList.length > 0 ? (
