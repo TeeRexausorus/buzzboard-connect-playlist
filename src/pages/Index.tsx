@@ -63,8 +63,8 @@ const Index = () => {
           transition={{ duration: 0.5 }}
         >
           <div className="flex items-center justify-center gap-3">
-            <Zap className={`${isConnected ? "w-6 h-6" : "w-12 h-12 animate-pulse"} text-primary`} />
-            <h1 className={`${isConnected ? "text-2xl md:text-3xl" : "text-5xl md:text-7xl text-glow"} font-display font-black text-foreground`}>
+            <Zap className={`${isConnected ? "w-4 h-4" : "w-12 h-12 animate-pulse"} text-primary`} />
+            <h1 className={`${isConnected ? "text-base md:text-lg" : "text-5xl md:text-7xl text-glow"} font-display font-black text-foreground`}>
               BUZZER CONTROL
             </h1>
           </div>
