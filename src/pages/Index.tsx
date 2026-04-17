@@ -57,20 +57,22 @@ const Index = () => {
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <motion.div
-          className="text-center space-y-4"
+          className={`text-center ${isConnected ? "space-y-1" : "space-y-4"}`}
           initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
+          animate={{ opacity: isConnected ? 0.6 : 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
           <div className="flex items-center justify-center gap-3">
-            <Zap className="w-12 h-12 text-primary animate-pulse" />
-            <h1 className="text-5xl md:text-7xl font-display font-black text-foreground text-glow">
+            <Zap className={`${isConnected ? "w-6 h-6" : "w-12 h-12 animate-pulse"} text-primary`} />
+            <h1 className={`${isConnected ? "text-2xl md:text-3xl" : "text-5xl md:text-7xl text-glow"} font-display font-black text-foreground`}>
               BUZZER CONTROL
             </h1>
           </div>
-          <p className="text-lg text-muted-foreground">
-            Real-time MQTT buzzer management system
-          </p>
+          {!isConnected && (
+            <p className="text-lg text-muted-foreground">
+              Real-time MQTT buzzer management system
+            </p>
+          )}
         </motion.div>
 
         {/* Connection Panel */}
