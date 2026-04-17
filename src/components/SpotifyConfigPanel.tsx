@@ -8,7 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Music, RefreshCw, LogOut } from "lucide-react";
+import { Music, RefreshCw, LogOut, Copy, Check } from "lucide-react";
+import { useState } from "react";
+import { toast } from "@/hooks/use-toast";
 
 interface SpotifyConfigPanelProps {
   clientId: string;
@@ -33,6 +35,20 @@ export const SpotifyConfigPanel = ({
   selectDevice,
   fetchDevices,
 }: SpotifyConfigPanelProps) => {
+  const redirectUri = window.location.origin + "/";
+  const [copied, setCopied] = useState(false);
+
+  const copyRedirectUri = async () => {
+    try {
+      await navigator.clipboard.writeText(redirectUri);
+      setCopied(true);
+      toast({ title: "Redirect URI copiée", description: redirectUri });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: "Copie impossible", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -53,10 +69,28 @@ export const SpotifyConfigPanel = ({
               placeholder="Ton Client ID depuis developer.spotify.com"
               className="bg-input border-border text-foreground mt-1"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Ajoute <code className="text-primary">{window.location.origin + "/"}</code> comme Redirect URI dans le
-              dashboard Spotify.
-            </p>
+            <div className="mt-2 space-y-1">
+              <Label className="text-xs text-muted-foreground">Redirect URI à déclarer dans Spotify</Label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs text-primary bg-muted px-2 py-1.5 rounded border border-border break-all">
+                  {redirectUri}
+                </code>
+                <Button
+                  type="button"
+                  onClick={copyRedirectUri}
+                  variant="outline"
+                  size="sm"
+                  className="bg-card border-border hover:bg-muted shrink-0"
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                💡 Raspberry Pi mobile : utilise un hostname mDNS stable type{" "}
+                <code className="text-primary">http://buzzer.local:PORT/</code> (au lieu de l'IP) pour une seule URI
+                valable sur tous les réseaux.
+              </p>
+            </div>
           </div>
           <Button onClick={login} disabled={!clientId} size="sm" className="bg-primary hover:bg-primary/90">
             Connecter Spotify
