@@ -137,6 +137,26 @@ export const BuzzerCard = ({ id, name, state, pressedAt, locked, score, onRename
             <Trophy className="w-5 h-5 text-yellow-400" />
             <span className="text-2xl font-display font-bold text-foreground">{score}</span>
             <span className="text-sm text-muted-foreground">pts</span>
+            <div className="ml-auto flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => onAdjustScore?.(id, -1)}
+                className="h-7 w-7 bg-card border-border hover:bg-muted"
+                title="Retirer un point"
+              >
+                <Minus className="w-3 h-3" />
+              </Button>
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => onAdjustScore?.(id, 1)}
+                className="h-7 w-7 bg-card border-border hover:bg-muted"
+                title="Ajouter un point"
+              >
+                <Plus className="w-3 h-3" />
+              </Button>
+            </div>
           </div>
           
           {state === 'pressed' && pressedAt && (
