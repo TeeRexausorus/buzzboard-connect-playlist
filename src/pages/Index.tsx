@@ -79,6 +79,7 @@ const Index = () => {
             isConnected={isConnected}
             onConnect={connect}
             onDisconnect={disconnect}
+            extraConfig={<SpotifyConfigPanel {...spotify} />}
           />
         </motion.div>
 
