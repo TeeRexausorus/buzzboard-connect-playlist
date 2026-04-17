@@ -90,7 +90,7 @@ const Index = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             <Button
-              onClick={handleCorrect}
+              onClick={onCorrect}
               disabled={pressedBuzzerId === null}
               className="bg-green-600 hover:bg-green-700 text-white font-semibold"
             >
@@ -98,7 +98,7 @@ const Index = () => {
               Correct
             </Button>
             <Button
-              onClick={handleWrong}
+              onClick={onWrong}
               disabled={pressedBuzzerId === null}
               className="bg-red-600 hover:bg-red-700 text-white font-semibold"
             >
@@ -106,7 +106,7 @@ const Index = () => {
               Faux
             </Button>
             <Button
-              onClick={reset}
+              onClick={onReset}
               variant="outline"
               className="bg-card border-border hover:bg-muted text-foreground font-semibold"
             >
