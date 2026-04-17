@@ -70,6 +70,11 @@ export const useSpotify = () => {
     () => localStorage.getItem("spotifyDeviceId") || ""
   );
   const [currentTrack, setCurrentTrack] = useState<SpotifyTrack | null>(null);
+  const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>(
+    () => localStorage.getItem("spotifyPlaylistId") || ""
+  );
+  const [playlistQueue, setPlaylistQueue] = useState<SpotifyTrack[]>([]);
 
   const isAuthed = !!auth;
 
