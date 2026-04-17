@@ -356,6 +356,7 @@ export const useMQTT = () => {
     handleWrong,
     updatePointValue,
     resetScores,
+    adjustScore,
     lockAll,
     publishConfig,
   };
