@@ -1,79 +1,56 @@
 
 
-## Intégration Spotify — mode Blind Test
+## Le problème
 
-### Vue d'ensemble
-Ajouter un panneau "Blind Test" qui se connecte à Spotify (compte Premium de l'animateur), contrôle un appareil Spotify déjà actif (PC, enceinte, app mobile…), permet de chercher un morceau et l'envoie en lecture. La musique se met automatiquement en pause quand un buzzer est pressé, reprend sur "Faux", et s'arrête sur "Correct" / "Reset".
+Spotify exige des Redirect URIs **exactes** dans le dashboard de l'app : pas de wildcards (`*`), pas de plages IP, pas de `0.0.0.0`. Or sur ton réseau local, le Pi aura `192.168.1.42` chez toi, `192.168.0.17` chez un pote, `10.0.0.5` au bureau…
 
-### Authentification Spotify
-L'API Spotify Web (search + player control) exige un OAuth utilisateur. Le mode connecteur Lovable (gateway) authentifie un seul compte côté workspace : c'est exactement ce qu'il nous faut puisqu'un seul animateur lance les morceaux.
+Bonne nouvelle : Spotify accepte **plusieurs Redirect URIs** dans une même app, ET autorise `http://127.0.0.1` et `http://localhost` sans HTTPS. On peut s'en sortir proprement.
 
-Deux options possibles, à confirmer si besoin :
-- **Option A — Connecteur Lovable Spotify** : si un connecteur Spotify existe dans la liste, on l'utilise via la gateway depuis une edge function (Lovable Cloud requis). Plus simple, pas de redirect URI à gérer.
-- **Option B — OAuth manuel "Authorization Code with PKCE"** côté frontend : on enregistre un Client ID Spotify (l'utilisateur le crée sur developer.spotify.com), on stocke le refresh token en localStorage. Pas besoin de backend.
+## Solution recommandée : un hostname mDNS stable
 
-→ Je propose de partir sur **Option B (PKCE frontend)** car :
-- Aucune edge function nécessaire, l'app reste 100% client comme aujourd'hui (cohérent avec l'archi MQTT actuelle).
-- Pas de dépendance à Lovable Cloud.
-- L'utilisateur saisit son Client ID Spotify une fois, persisté en localStorage.
+Au lieu de viser le Pi par son IP, on le vise par un **nom local** type `http://buzzer.local:8080`. Le Pi s'annonce sur le réseau via **Avahi/mDNS** (déjà inclus dans Raspberry Pi OS), et tous les appareils du LAN (mobile, PC, Mac) le résolvent automatiquement — **peu importe l'IP du moment**.
 
-Si tu préfères passer par le connecteur Lovable, dis-le et je révise le plan.
+Tu déclares **une seule** Redirect URI dans Spotify : `http://buzzer.local:8080/` → ça marche sur tous les réseaux, pour tous tes clients.
 
-### Endpoints Spotify utilisés
-- `GET /v1/me/player/devices` — lister les appareils actifs
-- `GET /v1/search?type=track&q=...` — recherche morceau
-- `PUT /v1/me/player/play` (avec `device_id` + `uris`) — lancer un morceau
-- `PUT /v1/me/player/pause` — pause
-- `PUT /v1/me/player/play` (sans body) — reprise
+### Étapes côté Pi (config système, pas de code)
+1. `sudo raspi-config` → changer le hostname en `buzzer` (ou ce que tu veux).
+2. Vérifier qu'Avahi tourne : `sudo systemctl status avahi-daemon` (actif par défaut sur Raspberry Pi OS).
+3. Servir l'app sur un port fixe (ex: 8080) avec `vite preview --host --port 8080` ou via un Caddy/nginx.
+4. Tester depuis un autre appareil : `ping buzzer.local` doit répondre.
 
-### Architecture des fichiers
-```text
-src/
-├── hooks/
-│   ├── useMQTT.ts                  (modifié : expose pressedBuzzerId déjà OK,
-│   │                                ajout d'un callback onBuzzerPressed via useEffect côté Index)
-│   └── useSpotify.ts               (nouveau : OAuth PKCE, token refresh, API calls)
-├── components/
-│   └── BlindTestPanel.tsx          (nouveau : login, sélection device,
-│                                    barre de recherche, résultats, contrôles play/pause,
-│                                    affichage piste en cours masquée/révélée)
-└── pages/
-    └── Index.tsx                   (modifié : insertion du panneau + branchement
-                                    auto-pause sur pressedBuzzerId,
-                                    auto-resume dans handleWrong, stop dans handleCorrect/reset)
-```
+### Côté Spotify Dashboard
+- Redirect URI à ajouter : `http://buzzer.local:8080/`
+- Spotify accepte les URIs `http://` uniquement pour `localhost`, `127.0.0.1` **et** les hostnames `.local` (mDNS). C'est documenté et stable.
 
-### Comportement UI
-1. **Bloc Blind Test** (visible uniquement quand MQTT connecté) avec :
-   - Bouton "Connecter Spotify" → flow PKCE, redirige sur Spotify puis revient sur `/` avec le code dans l'URL.
-   - Une fois loggé : sélecteur d'appareil Spotify actif (refresh manuel si rien).
-   - Champ de recherche + liste de résultats (titre, artiste, pochette). Clic sur un résultat → lance le morceau sur l'appareil sélectionné.
-   - Affichage du morceau en cours **masqué par défaut** (cache "???") avec un bouton "Révéler" pour spoiler titre/artiste après la manche.
-   - Boutons Play / Pause manuels en backup.
+### Côté code (changement minime)
+Actuellement `getRedirectUri()` retourne `window.location.origin + "/"`. Si tu accèdes au Pi via `http://buzzer.local:8080`, ça génère automatiquement `http://buzzer.local:8080/` → match parfait avec ce qui est déclaré chez Spotify. **Aucun changement de code nécessaire**, à condition de toujours taper `buzzer.local:8080` dans la barre d'adresse (jamais l'IP brute).
 
-2. **Liaison automatique avec les buzzers** (dans `Index.tsx`) :
-   - `useEffect` sur `pressedBuzzerId` : si ≠ null et morceau en cours → `pause()`.
-   - Wrapper autour de `handleWrong` : appelle l'original puis `resume()`.
-   - Wrapper autour de `handleCorrect` et `reset` : appelle l'original puis `pause()` (manche terminée).
+## Plan B : si mDNS ne marche pas (certains Android, réseaux d'entreprise)
 
-### Détails techniques (PKCE)
-- Génération code_verifier + code_challenge (SHA-256, base64url) via `crypto.subtle`.
-- Scopes demandés : `user-read-playback-state user-modify-playback-state`.
-- Token + refresh token + expiration stockés dans localStorage (`spotifyAuth`).
-- Auto-refresh dans `useSpotify` quand expiration < 60s avant chaque appel.
-- Redirect URI = `window.location.origin + '/'` (l'utilisateur devra ajouter cette URL dans son app Spotify Developer Dashboard).
+Ajouter dans le dashboard Spotify **plusieurs Redirect URIs en parallèle** :
+- `http://buzzer.local:8080/`
+- `http://127.0.0.1:8080/` (si tu y accèdes parfois depuis le Pi lui-même)
+- `http://192.168.1.42:8080/`, `http://192.168.0.17:8080/`… (les IPs des réseaux que tu fréquentes)
 
-### Ce que l'utilisateur devra faire une fois
-1. Créer une app sur https://developer.spotify.com/dashboard (gratuit).
-2. Copier le Client ID dans le panneau Blind Test.
-3. Ajouter l'URL de l'app Lovable comme Redirect URI dans le dashboard Spotify.
-4. Avoir Spotify ouvert quelque part (PC, mobile, enceinte connectée…) avec un compte **Premium** (obligatoire pour le contrôle distant).
+Spotify accepte autant d'URIs qu'on veut. Inconvénient : à chaque nouveau réseau, faut éditer le dashboard une fois.
 
-### Limitations à noter
-- Spotify Premium requis (limitation API, pas de contournement).
-- Si aucun appareil n'est actif, la lecture échoue → message d'erreur clair + bouton "Rafraîchir devices".
-- L'API a un délai de ~200-500ms sur play/pause, donc la pause sur buzz ne sera pas instantanée.
+Pour rendre ça moins pénible côté UI, je peux **petit ajout de code optionnel** :
+- Dans `SpotifyConfigPanel`, afficher dynamiquement la Redirect URI actuelle (`window.location.origin + "/"`) avec un bouton "Copier", pour qu'au premier lancement sur un nouveau réseau tu puisses la coller en 2 secondes dans le dashboard Spotify.
 
-### Suite
-Une fois ce plan validé, je passe en mode édition pour créer `useSpotify.ts`, `BlindTestPanel.tsx`, et brancher le tout dans `Index.tsx`.
+## Plan C : tunnel public (Tailscale / Cloudflare Tunnel)
+
+Si tu veux **zéro config réseau** et un accès même hors LAN :
+- **Tailscale** : installe sur le Pi + tes appareils → ils se voient via une IP `100.x.x.x` stable, peu importe le réseau. Redirect URI = `http://buzzer-pi.tailnet-name.ts.net:8080/`. Gratuit perso.
+- **Cloudflare Tunnel** : expose le Pi sur un sous-domaine public HTTPS gratuit (`buzzer.tonnom.workers.dev`). Plus lourd à setup mais HTTPS natif.
+
+## Recommandation
+
+**Plan A (mDNS `buzzer.local`)** pour 90% des cas — robuste, sans code, sans dépendance externe. Plan B (afficher/copier l'URI) en complément UX si tu veux que je l'ajoute. Plan C uniquement si t'as besoin d'accès hors LAN.
+
+## Ce que je peux coder maintenant (si tu veux)
+
+1. Afficher la Redirect URI courante avec un bouton "Copier" dans `SpotifyConfigPanel` (utile pour Plan B).
+2. Ajouter une mini doc dans le panneau ("Pour Raspberry Pi : utilise `http://buzzer.local:PORT/`").
+
+Sinon, c'est purement de la config Pi + dashboard Spotify, pas besoin de toucher au code.
 
