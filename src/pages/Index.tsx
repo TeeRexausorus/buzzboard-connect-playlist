@@ -283,7 +283,7 @@ const Index = () => {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.3, delay: index * 0.1 }}
               >
-                <BuzzerCard {...buzzer} onRename={renameBuzzer} onToggleLock={toggleLock} />
+                <BuzzerCard {...buzzer} onRename={renameBuzzer} onToggleLock={toggleLock} onAdjustScore={adjustScore} />
               </motion.div>
             ))}
           </motion.div>
