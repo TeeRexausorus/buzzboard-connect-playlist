@@ -257,8 +257,8 @@ const Index = () => {
           </motion.div>
         )}
 
-        {/* Blind Test Player — visible une fois MQTT connecté ET Spotify authentifié */}
-        {isConnected && spotify.isAuthed && (
+        {/* Blind Test Player — visible quand le mode Blind Test est activé */}
+        {isConnected && spotify.isAuthed && blindTestMode && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
