@@ -10,25 +10,32 @@ import { BlindTestPlayer } from "@/components/BlindTestPlayer";
 import { SpotifyConfigPanel } from "@/components/SpotifyConfigPanel";
 import { useMQTT } from "@/hooks/useMQTT";
 import { useSpotify } from "@/hooks/useSpotify";
-import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, Send } from "lucide-react";
+import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, Send, Music } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Index = () => {
   const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores, lockAll, publishConfig } = useMQTT();
   const spotify = useSpotify();
   const [showConfig, setShowConfig] = useState(false);
+  const [blindTestMode, setBlindTestMode] = useState(false);
 
-  // Auto-pause Spotify when a buzzer is pressed
+  // Auto-pause Spotify when a buzzer is pressed (only in blind test mode)
   const prevPressedRef = useRef<number | null>(null);
   useEffect(() => {
-    if (pressedBuzzerId !== null && prevPressedRef.current === null && spotify.currentTrack) {
+    if (
+      blindTestMode &&
+      pressedBuzzerId !== null &&
+      prevPressedRef.current === null &&
+      spotify.currentTrack
+    ) {
       spotify.pause();
     }
     prevPressedRef.current = pressedBuzzerId;
-  }, [pressedBuzzerId, spotify]);
+  }, [pressedBuzzerId, spotify, blindTestMode]);
 
   const onCorrect = async () => {
     handleCorrect();
+    if (!blindTestMode) return;
     if (spotify.selectedPlaylistId) {
       await spotify.playNextFromPlaylist();
     } else if (spotify.currentTrack) {
@@ -37,11 +44,11 @@ const Index = () => {
   };
   const onWrong = () => {
     handleWrong();
-    if (spotify.currentTrack) spotify.resume();
+    if (blindTestMode && spotify.currentTrack) spotify.resume();
   };
   const onReset = () => {
     reset();
-    if (spotify.currentTrack) spotify.pause();
+    if (blindTestMode && spotify.currentTrack) spotify.pause();
   };
 
   // LED config state
@@ -137,6 +144,15 @@ const Index = () => {
               <Settings className="w-4 h-4 mr-2" />
               Config
             </Button>
+            {spotify.isAuthed && (
+              <div className="flex items-center gap-2 px-3 rounded-md border border-border bg-card">
+                <Music className="w-4 h-4 text-primary" />
+                <Label htmlFor="blindTestMode" className="text-sm text-foreground font-semibold cursor-pointer">
+                  Mode Blind Test
+                </Label>
+                <Switch id="blindTestMode" checked={blindTestMode} onCheckedChange={setBlindTestMode} />
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -241,8 +257,8 @@ const Index = () => {
           </motion.div>
         )}
 
-        {/* Blind Test Player — visible une fois MQTT connecté ET Spotify authentifié */}
-        {isConnected && spotify.isAuthed && (
+        {/* Blind Test Player — visible quand le mode Blind Test est activé */}
+        {isConnected && spotify.isAuthed && blindTestMode && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
