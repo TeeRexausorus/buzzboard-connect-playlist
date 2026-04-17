@@ -362,11 +362,24 @@ export const useSpotify = () => {
     persistAuth(null);
     setCurrentTrack(null);
     setDevices([]);
+    setPlaylists([]);
+    setPlaylistQueue([]);
   };
 
-  // Auto-fetch devices once authed
+  // Auto-fetch devices + playlists once authed
   useEffect(() => {
-    if (isAuthed) fetchDevices();
+    if (isAuthed) {
+      fetchDevices();
+      fetchPlaylists();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthed]);
+
+  // Reload queue if a playlist was previously selected
+  useEffect(() => {
+    if (isAuthed && selectedPlaylistId && playlistQueue.length === 0) {
+      loadPlaylistQueue(selectedPlaylistId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthed]);
 
@@ -385,5 +398,11 @@ export const useSpotify = () => {
     pause,
     resume,
     currentTrack,
+    playlists,
+    selectedPlaylistId,
+    selectPlaylist,
+    fetchPlaylists,
+    playlistQueueLength: playlistQueue.length,
+    playNextFromPlaylist,
   };
 };
