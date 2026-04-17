@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Pencil, Check, X, Lock, Unlock, Trophy } from "lucide-react";
+import { Pencil, Check, X, Lock, Unlock, Trophy, Plus, Minus } from "lucide-react";
 
 interface BuzzerCardProps {
   id: number;
@@ -15,9 +15,10 @@ interface BuzzerCardProps {
   score: number;
   onRename?: (id: number, newName: string) => void;
   onToggleLock?: (id: number) => void;
+  onAdjustScore?: (id: number, delta: number) => void;
 }
 
-export const BuzzerCard = ({ id, name, state, pressedAt, locked, score, onRename, onToggleLock }: BuzzerCardProps) => {
+export const BuzzerCard = ({ id, name, state, pressedAt, locked, score, onRename, onToggleLock, onAdjustScore }: BuzzerCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
   
