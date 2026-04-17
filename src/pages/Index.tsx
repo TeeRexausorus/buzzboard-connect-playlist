@@ -10,7 +10,7 @@ import { BlindTestPlayer } from "@/components/BlindTestPlayer";
 import { SpotifyConfigPanel } from "@/components/SpotifyConfigPanel";
 import { useMQTT } from "@/hooks/useMQTT";
 import { useSpotify } from "@/hooks/useSpotify";
-import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, Send } from "lucide-react";
+import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, Send, Music } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Index = () => {
