@@ -27,9 +27,13 @@ const Index = () => {
     prevPressedRef.current = pressedBuzzerId;
   }, [pressedBuzzerId, spotify]);
 
-  const onCorrect = () => {
+  const onCorrect = async () => {
     handleCorrect();
-    if (spotify.currentTrack) spotify.pause();
+    if (spotify.selectedPlaylistId) {
+      await spotify.playNextFromPlaylist();
+    } else if (spotify.currentTrack) {
+      spotify.pause();
+    }
   };
   const onWrong = () => {
     handleWrong();

@@ -4,7 +4,7 @@ import { toast } from "@/hooks/use-toast";
 const AUTH_STORAGE_KEY = "spotifyAuth";
 const CLIENT_ID_STORAGE_KEY = "spotifyClientId";
 const VERIFIER_STORAGE_KEY = "spotifyCodeVerifier";
-const SCOPES = "user-read-playback-state user-modify-playback-state";
+const SCOPES = "user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative";
 
 interface SpotifyAuth {
   access_token: string;
@@ -27,6 +27,14 @@ export interface SpotifyTrack {
     name: string;
     images: { url: string; width: number; height: number }[];
   };
+}
+
+export interface SpotifyPlaylist {
+  id: string;
+  name: string;
+  images: { url: string }[];
+  tracks: { total: number };
+  owner: { display_name: string };
 }
 
 // ---------- PKCE helpers ----------
@@ -62,6 +70,11 @@ export const useSpotify = () => {
     () => localStorage.getItem("spotifyDeviceId") || ""
   );
   const [currentTrack, setCurrentTrack] = useState<SpotifyTrack | null>(null);
+  const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>(
+    () => localStorage.getItem("spotifyPlaylistId") || ""
+  );
+  const [playlistQueue, setPlaylistQueue] = useState<SpotifyTrack[]>([]);
 
   const isAuthed = !!auth;
 
@@ -234,10 +247,10 @@ export const useSpotify = () => {
   );
 
   const playTrack = useCallback(
-    async (track: SpotifyTrack) => {
+    async (track: SpotifyTrack): Promise<boolean> => {
       if (!selectedDeviceId) {
         toast({ title: "Aucun appareil", description: "Sélectionne un appareil Spotify actif", variant: "destructive" });
-        return;
+        return false;
       }
       const res = await apiFetch(`/me/player/play?device_id=${selectedDeviceId}`, {
         method: "PUT",
@@ -245,13 +258,83 @@ export const useSpotify = () => {
       });
       if (res.ok || res.status === 204) {
         setCurrentTrack(track);
-      } else {
-        const err = await res.text();
-        toast({ title: "Erreur lecture", description: err, variant: "destructive" });
+        return true;
       }
+      const err = await res.text();
+      toast({ title: "Erreur lecture", description: err, variant: "destructive" });
+      return false;
     },
     [apiFetch, selectedDeviceId]
   );
+
+  // ---------- Playlists ----------
+  const shuffle = <T,>(arr: T[]): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  const fetchPlaylists = useCallback(async () => {
+    try {
+      const all: SpotifyPlaylist[] = [];
+      let url: string | null = "/me/playlists?limit=50";
+      while (url) {
+        const res = await apiFetch(url);
+        if (!res.ok) break;
+        const data = await res.json();
+        all.push(...(data.items || []));
+        url = data.next ? data.next.replace("https://api.spotify.com/v1", "") : null;
+      }
+      setPlaylists(all);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [apiFetch]);
+
+  const loadPlaylistQueue = useCallback(
+    async (playlistId: string): Promise<SpotifyTrack[]> => {
+      const all: SpotifyTrack[] = [];
+      let url: string | null = `/playlists/${playlistId}/tracks?limit=100&fields=items(track(uri,name,artists(name),album(name,images))),next`;
+      while (url) {
+        const res = await apiFetch(url);
+        if (!res.ok) break;
+        const data = await res.json();
+        for (const it of data.items || []) {
+          if (it?.track?.uri) all.push(it.track as SpotifyTrack);
+        }
+        url = data.next ? data.next.replace("https://api.spotify.com/v1", "") : null;
+      }
+      const shuffled = shuffle(all);
+      setPlaylistQueue(shuffled);
+      toast({ title: "Playlist chargée", description: `${shuffled.length} morceaux mélangés` });
+      return shuffled;
+    },
+    [apiFetch]
+  );
+
+  const selectPlaylist = useCallback(
+    async (id: string) => {
+      setSelectedPlaylistId(id);
+      localStorage.setItem("spotifyPlaylistId", id);
+      if (id) await loadPlaylistQueue(id);
+      else setPlaylistQueue([]);
+    },
+    [loadPlaylistQueue]
+  );
+
+  const playNextFromPlaylist = useCallback(async (): Promise<boolean> => {
+    let queue = playlistQueue;
+    if (queue.length === 0 && selectedPlaylistId) {
+      queue = await loadPlaylistQueue(selectedPlaylistId);
+    }
+    if (queue.length === 0) return false;
+    const [next, ...rest] = queue;
+    setPlaylistQueue(rest);
+    return await playTrack(next);
+  }, [playlistQueue, selectedPlaylistId, loadPlaylistQueue, playTrack]);
 
   const pause = useCallback(async () => {
     if (!isAuthed) return;
@@ -279,11 +362,24 @@ export const useSpotify = () => {
     persistAuth(null);
     setCurrentTrack(null);
     setDevices([]);
+    setPlaylists([]);
+    setPlaylistQueue([]);
   };
 
-  // Auto-fetch devices once authed
+  // Auto-fetch devices + playlists once authed
   useEffect(() => {
-    if (isAuthed) fetchDevices();
+    if (isAuthed) {
+      fetchDevices();
+      fetchPlaylists();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthed]);
+
+  // Reload queue if a playlist was previously selected
+  useEffect(() => {
+    if (isAuthed && selectedPlaylistId && playlistQueue.length === 0) {
+      loadPlaylistQueue(selectedPlaylistId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthed]);
 
@@ -302,5 +398,11 @@ export const useSpotify = () => {
     pause,
     resume,
     currentTrack,
+    playlists,
+    selectedPlaylistId,
+    selectPlaylist,
+    fetchPlaylists,
+    playlistQueueLength: playlistQueue.length,
+    playNextFromPlaylist,
   };
 };

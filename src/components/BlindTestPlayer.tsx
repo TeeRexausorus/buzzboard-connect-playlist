@@ -3,16 +3,29 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Music, Search, Play, Pause, Eye, EyeOff } from "lucide-react";
-import type { SpotifyTrack } from "@/hooks/useSpotify";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Music, Search, Play, Pause, Eye, EyeOff, SkipForward, ListMusic, RefreshCw } from "lucide-react";
+import type { SpotifyTrack, SpotifyPlaylist } from "@/hooks/useSpotify";
 
 interface BlindTestPlayerProps {
   search: (q: string) => Promise<SpotifyTrack[]>;
-  playTrack: (t: SpotifyTrack) => void;
+  playTrack: (t: SpotifyTrack) => Promise<boolean> | void;
   pause: () => void;
   resume: () => void;
   currentTrack: SpotifyTrack | null;
   isAuthed: boolean;
+  playlists: SpotifyPlaylist[];
+  selectedPlaylistId: string;
+  selectPlaylist: (id: string) => void;
+  fetchPlaylists: () => void;
+  playlistQueueLength: number;
+  playNextFromPlaylist: () => Promise<boolean>;
 }
 
 export const BlindTestPlayer = ({
@@ -22,6 +35,12 @@ export const BlindTestPlayer = ({
   resume,
   currentTrack,
   isAuthed,
+  playlists,
+  selectedPlaylistId,
+  selectPlaylist,
+  fetchPlaylists,
+  playlistQueueLength,
+  playNextFromPlaylist,
 }: BlindTestPlayerProps) => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SpotifyTrack[]>([]);
@@ -44,11 +63,53 @@ export const BlindTestPlayer = ({
     setQuery("");
   };
 
+  const handleNext = async () => {
+    setRevealed(false);
+    await playNextFromPlaylist();
+  };
+
   return (
     <Card className="p-4 bg-card/50 border-border/50 backdrop-blur-sm space-y-4">
-      <div className="flex items-center gap-2">
-        <Music className="w-5 h-5 text-primary" />
-        <h3 className="text-lg font-display font-bold text-foreground">Blind Test</h3>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Music className="w-5 h-5 text-primary" />
+          <h3 className="text-lg font-display font-bold text-foreground">Blind Test</h3>
+        </div>
+        {selectedPlaylistId && (
+          <span className="text-xs text-muted-foreground">
+            {playlistQueueLength} restant{playlistQueueLength > 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
+
+      {/* Playlist selector */}
+      <div className="space-y-2">
+        <Label className="text-sm text-foreground flex items-center gap-2">
+          <ListMusic className="w-4 h-4" /> Playlist (auto "Suivant" sur Correct)
+        </Label>
+        <div className="flex gap-2">
+          <Select value={selectedPlaylistId || "none"} onValueChange={(v) => selectPlaylist(v === "none" ? "" : v)}>
+            <SelectTrigger className="bg-input border-border text-foreground flex-1">
+              <SelectValue placeholder="Sélectionner une playlist" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">— Aucune (recherche manuelle) —</SelectItem>
+              {playlists.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name} ({p.tracks.total})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={fetchPlaylists} variant="outline" size="sm" className="bg-card border-border hover:bg-muted">
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+          {selectedPlaylistId && (
+            <Button onClick={handleNext} size="sm" className="bg-primary hover:bg-primary/90">
+              <SkipForward className="w-4 h-4 mr-1" /> Suivant
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Search */}
