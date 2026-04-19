@@ -24,6 +24,8 @@ import {
   Image as ImageIcon,
   Music,
   Search,
+  Check,
+  X,
 } from "lucide-react";
 import type { UseQuizReturn, Question } from "@/hooks/useQuiz";
 import type { SpotifyTrack } from "@/hooks/useSpotify";
@@ -51,6 +53,11 @@ export const QuizBuilder = ({ quiz, spotifyAuthed, spotifySearch }: QuizBuilderP
   const [musicResults, setMusicResults] = useState<SpotifyTrack[]>([]);
   const [musicSearching, setMusicSearching] = useState(false);
   const [musicPrompt, setMusicPrompt] = useState("");
+
+  // Edit question state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<Question | null>(null);
+  const [editImgError, setEditImgError] = useState(false);
 
   const { activeQuiz } = quiz;
 
@@ -109,6 +116,106 @@ export const QuizBuilder = ({ quiz, spotifyAuthed, spotifySearch }: QuizBuilderP
     setMusicPrompt("");
   };
 
+  const startEdit = (q: Question) => {
+    setEditingId(q.id);
+    setEditDraft({ ...q });
+    setEditImgError(false);
+  };
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft(null);
+    setEditImgError(false);
+  };
+  const saveEdit = () => {
+    if (!editDraft || !editingId) return;
+    // Build a clean patch based on type
+    const { id, type, ...rest } = editDraft as Question & { id: string };
+    quiz.updateQuestion(editingId, rest as Partial<Question>);
+    cancelEdit();
+  };
+
+  const renderEditForm = (q: Question) => {
+    if (!editDraft) return null;
+
+    if (editDraft.type === "text") {
+      return (
+        <div className="space-y-2 w-full">
+          <Textarea
+            value={editDraft.prompt}
+            onChange={(e) => setEditDraft({ ...editDraft, prompt: e.target.value })}
+            className="bg-input border-border text-foreground"
+            placeholder="Question"
+          />
+          <Input
+            value={editDraft.answer || ""}
+            onChange={(e) => setEditDraft({ ...editDraft, answer: e.target.value })}
+            className="bg-input border-border text-foreground"
+            placeholder="Réponse (optionnel)"
+          />
+        </div>
+      );
+    }
+    if (editDraft.type === "image") {
+      return (
+        <div className="space-y-2 w-full">
+          <Input
+            value={editDraft.imageUrl}
+            onChange={(e) => { setEditDraft({ ...editDraft, imageUrl: e.target.value }); setEditImgError(false); }}
+            className="bg-input border-border text-foreground"
+            placeholder="URL de l'image"
+          />
+          {editDraft.imageUrl && (
+            <div className="rounded border border-border bg-muted/40 p-2 flex justify-center">
+              {editImgError ? (
+                <p className="text-xs text-destructive">Image impossible à charger</p>
+              ) : (
+                <img
+                  src={editDraft.imageUrl}
+                  alt="preview"
+                  onError={() => setEditImgError(true)}
+                  className="max-h-32 object-contain"
+                />
+              )}
+            </div>
+          )}
+          <Input
+            value={editDraft.prompt || ""}
+            onChange={(e) => setEditDraft({ ...editDraft, prompt: e.target.value })}
+            className="bg-input border-border text-foreground"
+            placeholder="Indication / question (optionnel)"
+          />
+          <Input
+            value={editDraft.answer || ""}
+            onChange={(e) => setEditDraft({ ...editDraft, answer: e.target.value })}
+            className="bg-input border-border text-foreground"
+            placeholder="Réponse (optionnel)"
+          />
+        </div>
+      );
+    }
+    // music: only prompt is editable (track is fixed)
+    return (
+      <div className="space-y-2 w-full">
+        <div className="flex items-center gap-2 p-2 rounded bg-muted/40 border border-border">
+          {editDraft.albumImage && <img src={editDraft.albumImage} alt="" className="w-10 h-10 rounded" />}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-foreground truncate">{editDraft.trackName}</div>
+            <div className="text-xs text-muted-foreground truncate">{editDraft.trackArtists}</div>
+          </div>
+        </div>
+        <Input
+          value={editDraft.prompt || ""}
+          onChange={(e) => setEditDraft({ ...editDraft, prompt: e.target.value })}
+          className="bg-input border-border text-foreground"
+          placeholder="Indication / consigne (optionnel)"
+        />
+        <p className="text-xs text-muted-foreground italic">
+          Pour changer le morceau, supprime cette question et ajoute-en une nouvelle.
+        </p>
+      </div>
+    );
+  };
+
   const renderQuestionRow = (q: Question, idx: number) => {
     const icon =
       q.type === "text" ? <Type className="w-4 h-4" /> :
@@ -119,11 +226,34 @@ export const QuizBuilder = ({ quiz, spotifyAuthed, spotifySearch }: QuizBuilderP
       q.type === "image" ? (q.prompt || q.imageUrl) :
       `${q.trackName} — ${q.trackArtists}`;
 
+    const isEditing = editingId === q.id;
+
+    if (isEditing) {
+      return (
+        <div key={q.id} className="flex items-start gap-2 p-2 rounded bg-muted/60 border border-primary/40">
+          <span className="text-xs text-muted-foreground w-6 tabular-nums pt-2">{idx + 1}.</span>
+          <span className="text-primary pt-2">{icon}</span>
+          <div className="flex-1 min-w-0">{renderEditForm(q)}</div>
+          <div className="flex flex-col gap-1">
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={saveEdit} title="Enregistrer">
+              <Check className="w-3.5 h-3.5" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={cancelEdit} title="Annuler">
+              <X className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div key={q.id} className="flex items-center gap-2 p-2 rounded bg-muted/40 border border-border">
         <span className="text-xs text-muted-foreground w-6 tabular-nums">{idx + 1}.</span>
         <span className="text-primary">{icon}</span>
         <span className="flex-1 text-sm text-foreground truncate">{label}</span>
+        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(q)} title="Modifier">
+          <Pencil className="w-3.5 h-3.5" />
+        </Button>
         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => quiz.moveQuestion(q.id, -1)} disabled={idx === 0}>
           <ArrowUp className="w-3.5 h-3.5" />
         </Button>
