@@ -19,14 +19,26 @@ import { motion } from "framer-motion";
 const Index = () => {
   const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores, adjustScore, lockAll, publishConfig } = useMQTT();
   const spotify = useSpotify();
+  const quiz = useQuiz();
   const [showConfig, setShowConfig] = useState(false);
   const [blindTestMode, setBlindTestMode] = useState(false);
+  const [quizMode, setQuizMode] = useState(false);
 
-  // Auto-pause Spotify when a buzzer is pressed (only in blind test mode)
+  const enableBlindTest = (v: boolean) => {
+    setBlindTestMode(v);
+    if (v) setQuizMode(false);
+  };
+  const enableQuiz = (v: boolean) => {
+    setQuizMode(v);
+    if (v) setBlindTestMode(false);
+  };
+
+  // Auto-pause Spotify when a buzzer is pressed (blind test or quiz music)
   const prevPressedRef = useRef<number | null>(null);
   useEffect(() => {
+    const isMusicQuestion = quizMode && quiz.currentQuestion?.type === "music";
     if (
-      blindTestMode &&
+      (blindTestMode || isMusicQuestion) &&
       pressedBuzzerId !== null &&
       prevPressedRef.current === null &&
       spotify.currentTrack
@@ -34,10 +46,15 @@ const Index = () => {
       spotify.pause();
     }
     prevPressedRef.current = pressedBuzzerId;
-  }, [pressedBuzzerId, spotify, blindTestMode]);
+  }, [pressedBuzzerId, spotify, blindTestMode, quizMode, quiz.currentQuestion]);
 
   const onCorrect = async () => {
     handleCorrect();
+    if (quizMode) {
+      if (quiz.currentQuestion?.type === "music" && spotify.currentTrack) spotify.pause();
+      quiz.next();
+      return;
+    }
     if (!blindTestMode) return;
     if (spotify.selectedPlaylistId) {
       await spotify.playNextFromPlaylist();
@@ -47,11 +64,15 @@ const Index = () => {
   };
   const onWrong = () => {
     handleWrong();
+    if (quizMode && quiz.currentQuestion?.type === "music" && spotify.currentTrack) {
+      spotify.resume();
+      return;
+    }
     if (blindTestMode && spotify.currentTrack) spotify.resume();
   };
   const onReset = () => {
     reset();
-    if (blindTestMode && spotify.currentTrack) spotify.pause();
+    if ((blindTestMode || (quizMode && quiz.currentQuestion?.type === "music")) && spotify.currentTrack) spotify.pause();
   };
 
   // LED config state
