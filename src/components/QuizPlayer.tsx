@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Play, Pause, RotateCcw, Type, Image as ImageIcon, Music } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Play, Pause, RotateCcw, Type, Image as ImageIcon, Music, ExternalLink } from "lucide-react";
 import type { UseQuizReturn } from "@/hooks/useQuiz";
 import type { SpotifyTrack } from "@/hooks/useSpotify";
 
