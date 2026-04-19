@@ -37,6 +37,7 @@ export interface Quiz {
 
 const QUIZZES_KEY = "quizzes";
 const ACTIVE_KEY = "activeQuizId";
+const RUNTIME_KEY = "quizRuntime"; // { index, revealed } — broadcast to display page
 
 const uid = () =>
   (typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -72,6 +73,14 @@ export const useQuiz = () => {
     if (activeQuizId) localStorage.setItem(ACTIVE_KEY, activeQuizId);
     else localStorage.removeItem(ACTIVE_KEY);
   }, [activeQuizId]);
+
+  // Persist runtime (index + revealed) so the Display page can mirror it
+  useEffect(() => {
+    localStorage.setItem(
+      RUNTIME_KEY,
+      JSON.stringify({ index: currentIndex, revealed, ts: Date.now() })
+    );
+  }, [currentIndex, revealed, activeQuizId]);
 
   // Ensure at least one quiz exists; auto-select first if none active
   useEffect(() => {
