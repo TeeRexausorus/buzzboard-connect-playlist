@@ -74,6 +74,14 @@ export const useQuiz = () => {
     else localStorage.removeItem(ACTIVE_KEY);
   }, [activeQuizId]);
 
+  // Persist runtime (index + revealed) so the Display page can mirror it
+  useEffect(() => {
+    localStorage.setItem(
+      RUNTIME_KEY,
+      JSON.stringify({ index: currentIndex, revealed, ts: Date.now() })
+    );
+  }, [currentIndex, revealed, activeQuizId]);
+
   // Ensure at least one quiz exists; auto-select first if none active
   useEffect(() => {
     if (quizzes.length === 0) {
