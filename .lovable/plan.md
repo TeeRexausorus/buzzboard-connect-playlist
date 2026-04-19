@@ -1,47 +1,90 @@
 
 
-## Décision retenue
+## Objectif
 
-UI servie en **HTTP** depuis le Pi (ou le PC portable), broker MQTT en **`ws://`** local. Pas de TLS, pas de tunnel, pas de prise de tête. Spotify reste utilisable car la redirect URI peut pointer vers `http://127.0.0.1:PORT/` côté loopback si besoin (ou on s'en passe en mobilité).
+Ajouter un système de **Quiz scénarisé** : enchaîner des questions de 3 types (texte lu par l'animateur, image à identifier, musique Spotify), avec gestion de plusieurs quiz nommés persistés en localStorage. Cohabite avec le Blind Test actuel (pas de remplacement).
 
-## Ce que je propose de modifier
-
-Trois petits ajustements code pour rendre ce setup robuste et rattraper les erreurs courantes :
-
-### 1. Garde-fou mixed-content dans `useMQTT.ts`
-Avant de tenter `mqtt.connect()`, détecter le cas où l'UI est servie en HTTPS et l'URL broker commence par `ws://` (ou inversement, HTTP + wss qui marche mais qu'on signale). Afficher un toast clair plutôt que de laisser le navigateur planter en silence.
+## Modèle de données
 
 ```ts
-if (window.location.protocol === 'https:' && broker.startsWith('ws://')) {
-  toast.error("UI en HTTPS : le broker doit être en wss://. Sers l'UI en HTTP ou utilise un broker WSS.");
-  return;
-}
+type Question =
+  | { id: string; type: "text"; prompt: string; answer?: string }
+  | { id: string; type: "image"; imageUrl: string; prompt?: string; answer?: string }
+  | { id: string; type: "music"; trackUri: string; trackName: string; trackArtists: string; albumImage?: string; prompt?: string };
+
+type Quiz = { id: string; name: string; questions: Question[]; createdAt: number };
 ```
 
-### 2. URL broker par défaut adaptative dans `ConnectionPanel.tsx`
-Au lieu du hardcodé `ws://localhost:9001/`, calculer un défaut basé sur l'origine courante :
-- Si HTTP → `ws://<hostname>:9001/` (utilise le hostname courant, pratique sur le Pi)
-- Si HTTPS → `wss://<hostname>:9001/`
+Persistance : `localStorage["quizzes"]` (liste) + `localStorage["activeQuizId"]`.
 
-Toujours overridable par l'utilisateur, et toujours persisté en localStorage (comportement actuel conservé).
+## Nouveaux fichiers
 
-### 3. Nettoyage SpotifyConfigPanel
-Retirer la mention `.local` ajoutée précédemment (devenue caduque) et la remplacer par une note courte : "Pour usage local : sers l'UI en HTTP et déclare `http://127.0.0.1:PORT/` comme redirect URI Spotify (loopback autorisé sans HTTPS)."
+### 1. `src/hooks/useQuiz.ts`
+Hook central :
+- CRUD quiz (create/rename/duplicate/delete)
+- CRUD questions au sein du quiz actif (add/edit/remove/reorder)
+- Navigation runtime : `currentIndex`, `next()`, `prev()`, `goTo(i)`, `reset()`
+- État `revealed` (réponse cachée/affichée)
+- Persistance auto en localStorage
+
+### 2. `src/components/QuizBuilder.tsx`
+Éditeur du quiz actif (en mode "préparation") :
+- Sélecteur de quiz (dropdown) + boutons Nouveau/Renommer/Dupliquer/Supprimer
+- Liste des questions avec drag-to-reorder (ou flèches haut/bas pour rester simple, sans dépendance)
+- Bouton "Ajouter question" → mini-form avec onglet Texte / Image / Musique
+  - **Texte** : champ prompt + champ réponse optionnelle
+  - **Image** : URL + preview live + champ réponse optionnelle
+  - **Musique** : réutilise `search()` de `useSpotify` pour piocher un track, stocke uri+meta
+- Édition inline / suppression par question
+
+### 3. `src/components/QuizPlayer.tsx`
+Lecteur runtime (en mode "jeu") :
+- Affiche la question courante en grand selon son type :
+  - **Text** : prompt en gros, bouton "Révéler la réponse"
+  - **Image** : image plein cadre, bouton révéler réponse
+  - **Music** : déclenche `playTrack()` Spotify au lancement, contrôles pause/resume/reveal (réutilise la logique du `BlindTestPlayer`)
+- Barre de progression "Question X / Y"
+- Boutons Précédent / Suivant
+- Auto-pause Spotify quand un buzzer est pressé (déjà géré dans `Index.tsx`, on étend pour couvrir music quiz)
+- "Correct" passe à la question suivante automatiquement (même logique que le Blind Test)
+
+## Modifications
+
+### `src/pages/Index.tsx`
+- Nouveau toggle **"Mode Quiz"** à côté de "Mode Blind Test" (mutuellement exclusifs ou indépendants — je propose mutuellement exclusifs pour éviter la confusion)
+- Si Mode Quiz activé : afficher `<QuizBuilder>` (toujours visible) et `<QuizPlayer>` (visible quand un quiz est chargé)
+- Étendre les handlers `onCorrect`/`onWrong`/`onReset` :
+  - `onCorrect` en mode Quiz → `quiz.next()` ; si question musique → `spotify.pause()`
+  - `onWrong` en mode Quiz → si question musique en cours, `spotify.resume()`
+- Le mode Quiz **ne nécessite pas Spotify** pour les questions text/image (toggle dispo même sans auth Spotify) ; questions musique grisées si pas authed.
+
+### `src/components/BlindTestPlayer.tsx`
+Aucun changement (cohabitation propre).
+
+### Mémoire
+Ajouter `mem://features/quiz-system` : décrit les 3 types de questions, la structure Quiz, la persistance localStorage, l'intégration avec les boutons Correct/Faux.
+Mettre à jour `mem://index.md` pour référencer cette nouvelle feature.
+
+## UX clés
+
+- **Pas de dépendance ajoutée** : drag-and-drop remplacé par flèches ↑↓ (suffit pour l'usage).
+- **Preview image** dans le builder pour valider l'URL avant de lancer.
+- **Fallback image cassée** : afficher un placeholder + warning si l'URL ne charge pas.
+- **Raccourcis clavier** dans le QuizPlayer : flèche droite = suivant, R = révéler (nice-to-have, à valider).
+- Quand on lance le mode Quiz et qu'aucun quiz n'existe, créer un "Quiz par défaut" vide automatiquement.
 
 ## Ce que je ne touche pas
 
-- Pas de changement protocole MQTT (toujours icicabuzz, topics inchangés).
-- Pas de changement scoring, buzzers, blind test.
-- Pas d'ajout de dépendance.
+- Logique MQTT / buzzers / scoring : inchangée.
+- Blind Test existant : intact, juste cohabite.
+- Spotify hook : juste consommé (search/playTrack/pause/resume), pas d'ajout d'API.
 
-## Mémoire à mettre à jour
+## Fichiers touchés (récap)
 
-Ajouter une note dans `mem://mqtt/connection-details` : "Déploiement cible = HTTP local (Pi ou PC), broker en `ws://`. HTTPS interdit côté UI pour éviter mixed-content avec broker non-TLS."
-
-## Fichiers touchés
-
-- `src/hooks/useMQTT.ts` — garde-fou mixed-content
-- `src/components/ConnectionPanel.tsx` — défaut broker basé sur `window.location`
-- `src/components/SpotifyConfigPanel.tsx` — corriger la mini-doc
-- `mem://mqtt/connection-details` — noter la décision archi
+- **Nouveau** `src/hooks/useQuiz.ts`
+- **Nouveau** `src/components/QuizBuilder.tsx`
+- **Nouveau** `src/components/QuizPlayer.tsx`
+- **Modifié** `src/pages/Index.tsx` (toggle + intégration handlers)
+- **Nouveau** `mem://features/quiz-system`
+- **Modifié** `mem://index.md`
 
