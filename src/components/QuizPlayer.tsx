@@ -58,11 +58,22 @@ export const QuizPlayer = ({ quiz, spotifyAuthed, playTrack, pause, resume }: Qu
       <div className="space-y-1">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>Question {currentIndex + 1} / {total}</span>
-          <span className="flex items-center gap-1">
-            {currentQuestion.type === "text" && <><Type className="w-3 h-3" /> Texte</>}
-            {currentQuestion.type === "image" && <><ImageIcon className="w-3 h-3" /> Image</>}
-            {currentQuestion.type === "music" && <><Music className="w-3 h-3" /> Musique</>}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1">
+              {currentQuestion.type === "text" && <><Type className="w-3 h-3" /> Texte</>}
+              {currentQuestion.type === "image" && <><ImageIcon className="w-3 h-3" /> Image</>}
+              {currentQuestion.type === "music" && <><Music className="w-3 h-3" /> Musique</>}
+            </span>
+            <a
+              href="/display"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-primary hover:underline"
+              title="Ouvrir l'affichage public dans un nouvel onglet"
+            >
+              <ExternalLink className="w-3 h-3" /> Affichage public
+            </a>
+          </div>
         </div>
         <Progress value={progress} />
       </div>
