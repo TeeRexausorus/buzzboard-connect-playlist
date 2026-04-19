@@ -8,22 +8,37 @@ import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { BuzzerCard } from "@/components/BuzzerCard";
 import { BlindTestPlayer } from "@/components/BlindTestPlayer";
 import { SpotifyConfigPanel } from "@/components/SpotifyConfigPanel";
+import { QuizBuilder } from "@/components/QuizBuilder";
+import { QuizPlayer } from "@/components/QuizPlayer";
 import { useMQTT } from "@/hooks/useMQTT";
 import { useSpotify } from "@/hooks/useSpotify";
-import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, Send, Music } from "lucide-react";
+import { useQuiz } from "@/hooks/useQuiz";
+import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, Send, Music, ListChecks } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Index = () => {
   const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores, adjustScore, lockAll, publishConfig } = useMQTT();
   const spotify = useSpotify();
+  const quiz = useQuiz();
   const [showConfig, setShowConfig] = useState(false);
   const [blindTestMode, setBlindTestMode] = useState(false);
+  const [quizMode, setQuizMode] = useState(false);
 
-  // Auto-pause Spotify when a buzzer is pressed (only in blind test mode)
+  const enableBlindTest = (v: boolean) => {
+    setBlindTestMode(v);
+    if (v) setQuizMode(false);
+  };
+  const enableQuiz = (v: boolean) => {
+    setQuizMode(v);
+    if (v) setBlindTestMode(false);
+  };
+
+  // Auto-pause Spotify when a buzzer is pressed (blind test or quiz music)
   const prevPressedRef = useRef<number | null>(null);
   useEffect(() => {
+    const isMusicQuestion = quizMode && quiz.currentQuestion?.type === "music";
     if (
-      blindTestMode &&
+      (blindTestMode || isMusicQuestion) &&
       pressedBuzzerId !== null &&
       prevPressedRef.current === null &&
       spotify.currentTrack
@@ -31,10 +46,15 @@ const Index = () => {
       spotify.pause();
     }
     prevPressedRef.current = pressedBuzzerId;
-  }, [pressedBuzzerId, spotify, blindTestMode]);
+  }, [pressedBuzzerId, spotify, blindTestMode, quizMode, quiz.currentQuestion]);
 
   const onCorrect = async () => {
     handleCorrect();
+    if (quizMode) {
+      if (quiz.currentQuestion?.type === "music" && spotify.currentTrack) spotify.pause();
+      quiz.next();
+      return;
+    }
     if (!blindTestMode) return;
     if (spotify.selectedPlaylistId) {
       await spotify.playNextFromPlaylist();
@@ -44,11 +64,15 @@ const Index = () => {
   };
   const onWrong = () => {
     handleWrong();
+    if (quizMode && quiz.currentQuestion?.type === "music" && spotify.currentTrack) {
+      spotify.resume();
+      return;
+    }
     if (blindTestMode && spotify.currentTrack) spotify.resume();
   };
   const onReset = () => {
     reset();
-    if (blindTestMode && spotify.currentTrack) spotify.pause();
+    if ((blindTestMode || (quizMode && quiz.currentQuestion?.type === "music")) && spotify.currentTrack) spotify.pause();
   };
 
   // LED config state
@@ -150,9 +174,16 @@ const Index = () => {
                 <Label htmlFor="blindTestMode" className="text-sm text-foreground font-semibold cursor-pointer">
                   Mode Blind Test
                 </Label>
-                <Switch id="blindTestMode" checked={blindTestMode} onCheckedChange={setBlindTestMode} />
+                <Switch id="blindTestMode" checked={blindTestMode} onCheckedChange={enableBlindTest} />
               </div>
             )}
+            <div className="flex items-center gap-2 px-3 rounded-md border border-border bg-card">
+              <ListChecks className="w-4 h-4 text-primary" />
+              <Label htmlFor="quizMode" className="text-sm text-foreground font-semibold cursor-pointer">
+                Mode Quiz
+              </Label>
+              <Switch id="quizMode" checked={quizMode} onCheckedChange={enableQuiz} />
+            </div>
           </motion.div>
         )}
 
@@ -265,6 +296,25 @@ const Index = () => {
             transition={{ duration: 0.4 }}
           >
             <BlindTestPlayer {...spotify} />
+          </motion.div>
+        )}
+
+        {/* Quiz mode — Builder + Player */}
+        {isConnected && quizMode && (
+          <motion.div
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <QuizBuilder quiz={quiz} spotifyAuthed={spotify.isAuthed} spotifySearch={spotify.search} />
+            <QuizPlayer
+              quiz={quiz}
+              spotifyAuthed={spotify.isAuthed}
+              playTrack={spotify.playTrack}
+              pause={spotify.pause}
+              resume={spotify.resume}
+            />
           </motion.div>
         )}
 
