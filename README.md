@@ -60,14 +60,45 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## How can I deploy this project?
+## Backend Quiz (PostgreSQL)
 
-Simply open [Lovable](https://lovable.dev/projects/bc3c4584-e13e-4e23-b0de-d485aac58ce4) and click on Share -> Publish.
+Le projet inclut maintenant un backend API pour lire/écrire les quizzes.
 
-## Can I connect a custom domain to my Lovable project?
+### 1. Configuration
 
-Yes, you can!
+Copiez `.env.example` vers `.env` et renseignez les variables PostgreSQL:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- `DATABASE_URL` (option DSN unique), ou
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSL`
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Variables utiles:
+
+- `BACKEND_PORT` (défaut `3001`)
+- `CORS_ORIGIN` (défaut `*`, recommandé `http://localhost:5173` en dev)
+
+### 2. Lancer le backend
+
+```sh
+npm run server:dev
+```
+
+API disponible sur `http://localhost:3001`.
+
+### 3. Endpoints
+
+- `GET /api/health`
+- `GET /api/quizzes`
+- `GET /api/quizzes/:id`
+- `POST /api/quizzes`
+- `PATCH /api/quizzes/:id`
+- `DELETE /api/quizzes/:id`
+
+Le SQL d'initialisation est dans `server/sql/001_init.sql` (la table est aussi créée automatiquement au démarrage).
+
+### 4. Front connecté au backend
+
+Le hook `useQuiz` appelle maintenant l'API `/api/quizzes`.
+
+- En dev, Vite proxy automatiquement `/api` vers `http://localhost:3001`.
+- En production, vous pouvez définir `VITE_API_BASE_URL` (ex: `https://api.mon-domaine.com`) pour préfixer les appels.
+- Si le backend est indisponible, le front bascule en fallback `localStorage`.
