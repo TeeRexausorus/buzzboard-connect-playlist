@@ -26,6 +26,8 @@ export interface MusicQuestion {
 }
 export type Question = TextQuestion | ImageQuestion | MusicQuestion;
 
+type DistributiveOmit<T, K extends keyof any> = T extends any ? Omit<T, K> : never;
+
 export interface Quiz {
   id: string;
   name: string;
@@ -141,7 +143,7 @@ export const useQuiz = () => {
 
   // ---- Question CRUD ----
   const addQuestion = useCallback(
-    (q: Omit<Question, "id">) => {
+    (q: DistributiveOmit<Question, "id">) => {
       if (!activeQuizId) return;
       const newQ = { ...q, id: uid() } as Question;
       setQuizzes((prev) =>
