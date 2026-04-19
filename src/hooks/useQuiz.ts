@@ -37,6 +37,7 @@ export interface Quiz {
 
 const QUIZZES_KEY = "quizzes";
 const ACTIVE_KEY = "activeQuizId";
+const RUNTIME_KEY = "quizRuntime"; // { index, revealed } — broadcast to display page
 
 const uid = () =>
   (typeof crypto !== "undefined" && "randomUUID" in crypto
