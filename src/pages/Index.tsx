@@ -299,6 +299,25 @@ const Index = () => {
           </motion.div>
         )}
 
+        {/* Quiz mode — Builder + Player */}
+        {isConnected && quizMode && (
+          <motion.div
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <QuizBuilder quiz={quiz} spotifyAuthed={spotify.isAuthed} spotifySearch={spotify.search} />
+            <QuizPlayer
+              quiz={quiz}
+              spotifyAuthed={spotify.isAuthed}
+              playTrack={spotify.playTrack}
+              pause={spotify.pause}
+              resume={spotify.resume}
+            />
+          </motion.div>
+        )}
+
         {/* Buzzers Grid */}
         {buzzerList.length > 0 ? (
           <motion.div
