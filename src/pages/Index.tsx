@@ -153,9 +153,16 @@ const Index = () => {
                 <Label htmlFor="blindTestMode" className="text-sm text-foreground font-semibold cursor-pointer">
                   Mode Blind Test
                 </Label>
-                <Switch id="blindTestMode" checked={blindTestMode} onCheckedChange={setBlindTestMode} />
+                <Switch id="blindTestMode" checked={blindTestMode} onCheckedChange={enableBlindTest} />
               </div>
             )}
+            <div className="flex items-center gap-2 px-3 rounded-md border border-border bg-card">
+              <ListChecks className="w-4 h-4 text-primary" />
+              <Label htmlFor="quizMode" className="text-sm text-foreground font-semibold cursor-pointer">
+                Mode Quiz
+              </Label>
+              <Switch id="quizMode" checked={quizMode} onCheckedChange={enableQuiz} />
+            </div>
           </motion.div>
         )}
 
