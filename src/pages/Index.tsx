@@ -8,9 +8,12 @@ import { ConnectionPanel } from "@/components/ConnectionPanel";
 import { BuzzerCard } from "@/components/BuzzerCard";
 import { BlindTestPlayer } from "@/components/BlindTestPlayer";
 import { SpotifyConfigPanel } from "@/components/SpotifyConfigPanel";
+import { QuizBuilder } from "@/components/QuizBuilder";
+import { QuizPlayer } from "@/components/QuizPlayer";
 import { useMQTT } from "@/hooks/useMQTT";
 import { useSpotify } from "@/hooks/useSpotify";
-import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, Send, Music } from "lucide-react";
+import { useQuiz } from "@/hooks/useQuiz";
+import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, Send, Music, ListChecks } from "lucide-react";
 import { motion } from "framer-motion";
 
 const Index = () => {
