@@ -4,7 +4,7 @@ import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from
 import { ZodError } from "zod";
 import { pool, initDatabase } from "./db";
 import { env, validateEnv } from "./env";
-import { createQuizSchema, loginSchema, updateQuizSchema } from "./validation";
+import { createQuizSchema, loginSchema, shareQuizWithUserSchema, updateQuizSchema } from "./validation";
 
 type QuizRow = {
   id: string;
@@ -21,13 +21,13 @@ type UserRow = {
   password_hash: string;
 };
 
-type QuizShareRow = {
+type QuizCollaboratorRow = {
   id: string;
   quiz_id: string;
-  token: string;
-  created_by: string;
+  user_id: string;
+  granted_by: string;
+  login: string;
   created_at: Date | string;
-  revoked_at: Date | string | null;
 };
 
 const mapRowToQuiz = (row: QuizRow) => ({
@@ -38,12 +38,12 @@ const mapRowToQuiz = (row: QuizRow) => ({
   updatedAt: new Date(row.updated_at).getTime(),
 });
 
-const mapRowToQuizShare = (row: QuizShareRow) => ({
+const mapRowToQuizCollaborator = (row: QuizCollaboratorRow) => ({
   id: row.id,
   quizId: row.quiz_id,
-  token: row.token,
+  userId: row.user_id,
+  login: row.login,
   createdAt: new Date(row.created_at).getTime(),
-  revokedAt: row.revoked_at ? new Date(row.revoked_at).getTime() : null,
 });
 
 const TOKEN_SEPARATOR = ".";
@@ -137,6 +137,27 @@ const findOwnedQuiz = async (quizId: string, userId: string): Promise<QuizRow | 
   return result.rowCount === 0 ? null : result.rows[0];
 };
 
+const findAccessibleQuiz = async (quizId: string, userId: string): Promise<QuizRow | null> => {
+  const result = await pool.query<QuizRow>(
+    `
+    SELECT q.id, q.user_id, q.name, q.questions, q.created_at, q.updated_at
+    FROM quizzes q
+    WHERE q.id = $1
+      AND (
+        q.user_id = $2
+        OR EXISTS (
+          SELECT 1
+          FROM quiz_collaborators qc
+          WHERE qc.quiz_id = q.id AND qc.user_id = $2
+        )
+      )
+    `,
+    [quizId, userId],
+  );
+
+  return result.rowCount === 0 ? null : result.rows[0];
+};
+
 const app = express();
 
 app.use(cors({ origin: env.corsOrigin === "*" ? true : env.corsOrigin }));
@@ -144,35 +165,6 @@ app.use(express.json());
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
-});
-
-app.get("/api/shared/quizzes/:token", async (req, res, next) => {
-  try {
-    const shareToken = getSingleParam(req.params.token);
-    if (!shareToken) {
-      res.status(400).json({ message: "Invalid share token" });
-      return;
-    }
-
-    const result = await pool.query<QuizRow>(
-      `
-      SELECT q.id, q.user_id, q.name, q.questions, q.created_at, q.updated_at
-      FROM quiz_shares qs
-      INNER JOIN quizzes q ON q.id = qs.quiz_id
-      WHERE qs.token = $1 AND qs.revoked_at IS NULL
-      `,
-      [shareToken],
-    );
-
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: "Shared quiz not found" });
-      return;
-    }
-
-    res.json(mapRowToQuiz(result.rows[0]));
-  } catch (error) {
-    next(error);
-  }
 });
 
 app.post("/api/auth/login", async (req, res, next) => {
@@ -228,9 +220,11 @@ app.get("/api/quizzes", requireAuth, async (req, res, next) => {
     const authReq = req as AuthenticatedRequest;
     const result = await pool.query<QuizRow>(
       `
-      SELECT id, user_id, name, questions, created_at, updated_at
-      FROM quizzes
-      WHERE user_id = $1
+      SELECT DISTINCT q.id, q.user_id, q.name, q.questions, q.created_at, q.updated_at
+      FROM quizzes q
+      LEFT JOIN quiz_collaborators qc
+        ON qc.quiz_id = q.id
+      WHERE q.user_id = $1 OR qc.user_id = $1
       ORDER BY created_at ASC
       `,
       [authReq.auth.userId],
@@ -243,22 +237,21 @@ app.get("/api/quizzes", requireAuth, async (req, res, next) => {
 
 app.get("/api/quizzes/:id", requireAuth, async (req, res, next) => {
   try {
-    const authReq = req as AuthenticatedRequest;
-    const result = await pool.query<QuizRow>(
-      `
-      SELECT id, user_id, name, questions, created_at, updated_at
-      FROM quizzes
-      WHERE id = $1 AND user_id = $2
-      `,
-      [req.params.id, authReq.auth.userId],
-    );
+    const quizId = getSingleParam(req.params.id);
+    if (!quizId) {
+      res.status(400).json({ message: "Invalid quiz id" });
+      return;
+    }
 
-    if (result.rowCount === 0) {
+    const authReq = req as AuthenticatedRequest;
+    const quiz = await findAccessibleQuiz(quizId, authReq.auth.userId);
+
+    if (!quiz) {
       res.status(404).json({ message: "Quiz not found" });
       return;
     }
 
-    res.json(mapRowToQuiz(result.rows[0]));
+    res.json(mapRowToQuiz(quiz));
   } catch (error) {
     next(error);
   }
@@ -286,7 +279,19 @@ app.post("/api/quizzes", requireAuth, async (req, res, next) => {
 
 app.patch("/api/quizzes/:id", requireAuth, async (req, res, next) => {
   try {
+    const quizId = getSingleParam(req.params.id);
+    if (!quizId) {
+      res.status(400).json({ message: "Invalid quiz id" });
+      return;
+    }
+
     const authReq = req as AuthenticatedRequest;
+    const accessibleQuiz = await findAccessibleQuiz(quizId, authReq.auth.userId);
+    if (!accessibleQuiz) {
+      res.status(404).json({ message: "Quiz not found" });
+      return;
+    }
+
     const payload = updateQuizSchema.parse(req.body);
 
     const result = await pool.query<QuizRow>(
@@ -296,14 +301,13 @@ app.patch("/api/quizzes/:id", requireAuth, async (req, res, next) => {
         name = COALESCE($2, name),
         questions = COALESCE($3::jsonb, questions),
         updated_at = NOW()
-      WHERE id = $1 AND user_id = $4
+      WHERE id = $1
       RETURNING id, user_id, name, questions, created_at, updated_at
       `,
       [
-        req.params.id,
+        quizId,
         payload.name ?? null,
         payload.questions === undefined ? null : JSON.stringify(payload.questions),
-        authReq.auth.userId,
       ],
     );
 
@@ -351,21 +355,18 @@ app.get("/api/quizzes/:id/share", requireAuth, async (req, res, next) => {
       return;
     }
 
-    const result = await pool.query<QuizShareRow>(
+    const result = await pool.query<QuizCollaboratorRow>(
       `
-      SELECT id, quiz_id, token, created_by, created_at, revoked_at
-      FROM quiz_shares
-      WHERE quiz_id = $1 AND revoked_at IS NULL
+      SELECT qc.id, qc.quiz_id, qc.user_id, qc.granted_by, u.login, qc.created_at
+      FROM quiz_collaborators qc
+      INNER JOIN users u ON u.id = qc.user_id
+      WHERE qc.quiz_id = $1
+      ORDER BY u.login ASC
       `,
       [quizId],
     );
 
-    if (result.rowCount === 0) {
-      res.json({ share: null });
-      return;
-    }
-
-    res.json({ share: mapRowToQuizShare(result.rows[0]) });
+    res.json({ collaborators: result.rows.map(mapRowToQuizCollaborator) });
   } catch (error) {
     next(error);
   }
@@ -386,40 +387,63 @@ app.post("/api/quizzes/:id/share", requireAuth, async (req, res, next) => {
       return;
     }
 
-    const existing = await pool.query<QuizShareRow>(
-      `
-      SELECT id, quiz_id, token, created_by, created_at, revoked_at
-      FROM quiz_shares
-      WHERE quiz_id = $1 AND revoked_at IS NULL
-      `,
-      [quizId],
+    const payload = shareQuizWithUserSchema.parse(req.body);
+    const normalizedLogin = payload.login.trim().toLowerCase();
+
+    const targetUserResult = await pool.query<UserRow>(
+      "SELECT id, login, password_hash FROM users WHERE login = $1",
+      [normalizedLogin],
     );
 
-    if (existing.rowCount !== 0) {
-      res.status(200).json({ share: mapRowToQuizShare(existing.rows[0]) });
+    if (targetUserResult.rowCount === 0) {
+      res.status(404).json({ message: "User not found" });
       return;
     }
 
-    const created = await pool.query<QuizShareRow>(
+    const targetUser = targetUserResult.rows[0];
+    if (targetUser.id === authReq.auth.userId) {
+      res.status(400).json({ message: "You already own this quiz" });
+      return;
+    }
+
+    const created = await pool.query<QuizCollaboratorRow>(
       `
-      INSERT INTO quiz_shares (id, quiz_id, token, created_by)
+      INSERT INTO quiz_collaborators (id, quiz_id, user_id, granted_by)
       VALUES ($1, $2, $3, $4)
-      RETURNING id, quiz_id, token, created_by, created_at, revoked_at
+      ON CONFLICT (quiz_id, user_id) DO UPDATE
+      SET granted_by = EXCLUDED.granted_by
+      RETURNING id, quiz_id, user_id, granted_by, created_at
       `,
-      [randomUUID(), quizId, randomUUID(), authReq.auth.userId],
+      [randomUUID(), quizId, targetUser.id, authReq.auth.userId],
     );
 
-    res.status(201).json({ share: mapRowToQuizShare(created.rows[0]) });
+    const collaboratorResult = await pool.query<QuizCollaboratorRow>(
+      `
+      SELECT qc.id, qc.quiz_id, qc.user_id, qc.granted_by, u.login, qc.created_at
+      FROM quiz_collaborators qc
+      INNER JOIN users u ON u.id = qc.user_id
+      WHERE qc.id = $1
+      `,
+      [created.rows[0].id],
+    );
+
+    res.status(201).json({ collaborator: mapRowToQuizCollaborator(collaboratorResult.rows[0]) });
   } catch (error) {
     next(error);
   }
 });
 
-app.delete("/api/quizzes/:id/share", requireAuth, async (req, res, next) => {
+app.delete("/api/quizzes/:id/share/:login", requireAuth, async (req, res, next) => {
   try {
     const quizId = getSingleParam(req.params.id);
     if (!quizId) {
       res.status(400).json({ message: "Invalid quiz id" });
+      return;
+    }
+
+    const collaboratorLogin = getSingleParam(req.params.login);
+    if (!collaboratorLogin) {
+      res.status(400).json({ message: "Invalid collaborator login" });
       return;
     }
 
@@ -432,11 +456,15 @@ app.delete("/api/quizzes/:id/share", requireAuth, async (req, res, next) => {
 
     await pool.query(
       `
-      UPDATE quiz_shares
-      SET revoked_at = NOW()
-      WHERE quiz_id = $1 AND revoked_at IS NULL
+      DELETE FROM quiz_collaborators
+      WHERE quiz_id = $1
+        AND user_id IN (
+          SELECT id
+          FROM users
+          WHERE login = $2
+        )
       `,
-      [quizId],
+      [quizId, collaboratorLogin.trim().toLowerCase()],
     );
 
     res.status(204).send();

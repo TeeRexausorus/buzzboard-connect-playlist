@@ -95,11 +95,10 @@ API disponible sur `http://localhost:3001`.
 - `DELETE /api/quizzes/:id` (`Authorization: Bearer <token>`)
 - `GET /api/quizzes/:id/share` (`Authorization: Bearer <token>`)
 - `POST /api/quizzes/:id/share` (`Authorization: Bearer <token>`)
-- `DELETE /api/quizzes/:id/share` (`Authorization: Bearer <token>`)
-- `GET /api/shared/quizzes/:token`
+- `DELETE /api/quizzes/:id/share/:login` (`Authorization: Bearer <token>`)
 
 `POST /api/auth/login` crée automatiquement le compte si le login n'existe pas encore, puis renvoie un token Bearer.
-`POST /api/quizzes/:id/share` crée un lien public persistant pour une playlist. `DELETE /api/quizzes/:id/share` le révoque.
+`POST /api/quizzes/:id/share` ajoute un collaborateur à partir de son login. Un collaborateur peut lire et modifier la playlist, sans en devenir propriétaire.
 
 Le SQL d'initialisation est dans `server/sql/001_init.sql` (la table est aussi créée automatiquement au démarrage).
 

@@ -41,6 +41,10 @@ export const loginSchema = z.object({
   password: z.string().min(6).max(255),
 });
 
+export const shareQuizWithUserSchema = z.object({
+  login: z.string().trim().min(3).max(100),
+});
+
 export const updateQuizSchema = z
   .object({
     name: z.string().trim().min(1).max(255).optional(),
@@ -54,3 +58,4 @@ export type QuestionPayload = z.infer<typeof questionSchema>;
 export type CreateQuizPayload = z.infer<typeof createQuizSchema>;
 export type UpdateQuizPayload = z.infer<typeof updateQuizSchema>;
 export type LoginPayload = z.infer<typeof loginSchema>;
+export type ShareQuizWithUserPayload = z.infer<typeof shareQuizWithUserSchema>;
