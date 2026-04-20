@@ -35,6 +35,8 @@ export interface Quiz {
   id: string;
   name: string;
   questions: Question[];
+  access?: "owned" | "shared";
+  ownerLogin?: string | null;
   createdAt: number;
   updatedAt?: number;
 }

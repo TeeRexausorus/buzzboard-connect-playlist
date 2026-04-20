@@ -11,9 +11,12 @@ type QuizRow = {
   user_id: string | null;
   name: string;
   questions: unknown;
+  owner_login: string | null;
   created_at: Date | string;
   updated_at: Date | string;
 };
+
+type QuizAccess = "owned" | "shared";
 
 type UserRow = {
   id: string;
@@ -30,10 +33,12 @@ type QuizCollaboratorRow = {
   created_at: Date | string;
 };
 
-const mapRowToQuiz = (row: QuizRow) => ({
+const mapRowToQuiz = (row: QuizRow, currentUserId?: string) => ({
   id: row.id,
   name: row.name,
   questions: row.questions,
+  access: row.user_id === currentUserId ? "owned" : "shared" satisfies QuizAccess,
+  ownerLogin: row.owner_login,
   createdAt: new Date(row.created_at).getTime(),
   updatedAt: new Date(row.updated_at).getTime(),
 });
@@ -127,9 +132,10 @@ const requireAuth: express.RequestHandler = (req, res, next) => {
 const findOwnedQuiz = async (quizId: string, userId: string): Promise<QuizRow | null> => {
   const result = await pool.query<QuizRow>(
     `
-    SELECT id, user_id, name, questions, created_at, updated_at
-    FROM quizzes
-    WHERE id = $1 AND user_id = $2
+    SELECT q.id, q.user_id, q.name, q.questions, u.login AS owner_login, q.created_at, q.updated_at
+    FROM quizzes q
+    INNER JOIN users u ON u.id = q.user_id
+    WHERE q.id = $1 AND q.user_id = $2
     `,
     [quizId, userId],
   );
@@ -140,8 +146,9 @@ const findOwnedQuiz = async (quizId: string, userId: string): Promise<QuizRow | 
 const findAccessibleQuiz = async (quizId: string, userId: string): Promise<QuizRow | null> => {
   const result = await pool.query<QuizRow>(
     `
-    SELECT q.id, q.user_id, q.name, q.questions, q.created_at, q.updated_at
+    SELECT q.id, q.user_id, q.name, q.questions, u.login AS owner_login, q.created_at, q.updated_at
     FROM quizzes q
+    INNER JOIN users u ON u.id = q.user_id
     WHERE q.id = $1
       AND (
         q.user_id = $2
@@ -220,8 +227,9 @@ app.get("/api/quizzes", requireAuth, async (req, res, next) => {
     const authReq = req as AuthenticatedRequest;
     const result = await pool.query<QuizRow>(
       `
-      SELECT DISTINCT q.id, q.user_id, q.name, q.questions, q.created_at, q.updated_at
+      SELECT DISTINCT q.id, q.user_id, q.name, q.questions, owner_user.login AS owner_login, q.created_at, q.updated_at
       FROM quizzes q
+      INNER JOIN users owner_user ON owner_user.id = q.user_id
       LEFT JOIN quiz_collaborators qc
         ON qc.quiz_id = q.id
       WHERE q.user_id = $1 OR qc.user_id = $1
@@ -229,7 +237,7 @@ app.get("/api/quizzes", requireAuth, async (req, res, next) => {
       `,
       [authReq.auth.userId],
     );
-    res.json(result.rows.map(mapRowToQuiz));
+    res.json(result.rows.map((row) => mapRowToQuiz(row, authReq.auth.userId)));
   } catch (error) {
     next(error);
   }
@@ -251,7 +259,7 @@ app.get("/api/quizzes/:id", requireAuth, async (req, res, next) => {
       return;
     }
 
-    res.json(mapRowToQuiz(quiz));
+    res.json(mapRowToQuiz(quiz, authReq.auth.userId));
   } catch (error) {
     next(error);
   }
@@ -266,12 +274,18 @@ app.post("/api/quizzes", requireAuth, async (req, res, next) => {
       `
       INSERT INTO quizzes (id, user_id, name, questions)
       VALUES ($1, $2, $3, $4::jsonb)
-      RETURNING id, user_id, name, questions, created_at, updated_at
+      RETURNING id
       `,
       [id, authReq.auth.userId, payload.name, JSON.stringify(payload.questions)],
     );
 
-    res.status(201).json(mapRowToQuiz(result.rows[0]));
+    const createdQuiz = await findAccessibleQuiz(result.rows[0].id, authReq.auth.userId);
+    if (!createdQuiz) {
+      res.status(500).json({ message: "Failed to load created quiz" });
+      return;
+    }
+
+    res.status(201).json(mapRowToQuiz(createdQuiz, authReq.auth.userId));
   } catch (error) {
     next(error);
   }
@@ -302,7 +316,7 @@ app.patch("/api/quizzes/:id", requireAuth, async (req, res, next) => {
         questions = COALESCE($3::jsonb, questions),
         updated_at = NOW()
       WHERE id = $1
-      RETURNING id, user_id, name, questions, created_at, updated_at
+      RETURNING id
       `,
       [
         quizId,
@@ -316,7 +330,13 @@ app.patch("/api/quizzes/:id", requireAuth, async (req, res, next) => {
       return;
     }
 
-    res.json(mapRowToQuiz(result.rows[0]));
+    const updatedQuiz = await findAccessibleQuiz(result.rows[0].id, authReq.auth.userId);
+    if (!updatedQuiz) {
+      res.status(500).json({ message: "Failed to load updated quiz" });
+      return;
+    }
+
+    res.json(mapRowToQuiz(updatedQuiz, authReq.auth.userId));
   } catch (error) {
     next(error);
   }

@@ -17,7 +17,7 @@ const parseBoolean = (value: string | undefined): boolean | undefined => {
 
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
-  port: parseIntOrDefault(process.env.BACKEND_PORT, 3001),
+  port: parseIntOrDefault(process.env.PORT ?? process.env.BACKEND_PORT, 3001),
   corsOrigin: process.env.CORS_ORIGIN ?? "*",
   authSecret: process.env.AUTH_SECRET ?? "dev-only-auth-secret-change-me",
   databaseUrl: process.env.DATABASE_URL,
