@@ -21,12 +21,29 @@ type UserRow = {
   password_hash: string;
 };
 
+type QuizShareRow = {
+  id: string;
+  quiz_id: string;
+  token: string;
+  created_by: string;
+  created_at: Date | string;
+  revoked_at: Date | string | null;
+};
+
 const mapRowToQuiz = (row: QuizRow) => ({
   id: row.id,
   name: row.name,
   questions: row.questions,
   createdAt: new Date(row.created_at).getTime(),
   updatedAt: new Date(row.updated_at).getTime(),
+});
+
+const mapRowToQuizShare = (row: QuizShareRow) => ({
+  id: row.id,
+  quizId: row.quiz_id,
+  token: row.token,
+  createdAt: new Date(row.created_at).getTime(),
+  revokedAt: row.revoked_at ? new Date(row.revoked_at).getTime() : null,
 });
 
 const TOKEN_SEPARATOR = ".";
@@ -85,6 +102,11 @@ const verifyAuthToken = (token: string): { userId: string } | null => {
 
 type AuthenticatedRequest = express.Request & { auth: { userId: string } };
 
+const getSingleParam = (value: string | string[] | undefined): string | null => {
+  if (typeof value === "string") return value;
+  return null;
+};
+
 const requireAuth: express.RequestHandler = (req, res, next) => {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
@@ -102,6 +124,19 @@ const requireAuth: express.RequestHandler = (req, res, next) => {
   next();
 };
 
+const findOwnedQuiz = async (quizId: string, userId: string): Promise<QuizRow | null> => {
+  const result = await pool.query<QuizRow>(
+    `
+    SELECT id, user_id, name, questions, created_at, updated_at
+    FROM quizzes
+    WHERE id = $1 AND user_id = $2
+    `,
+    [quizId, userId],
+  );
+
+  return result.rowCount === 0 ? null : result.rows[0];
+};
+
 const app = express();
 
 app.use(cors({ origin: env.corsOrigin === "*" ? true : env.corsOrigin }));
@@ -109,6 +144,35 @@ app.use(express.json());
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+app.get("/api/shared/quizzes/:token", async (req, res, next) => {
+  try {
+    const shareToken = getSingleParam(req.params.token);
+    if (!shareToken) {
+      res.status(400).json({ message: "Invalid share token" });
+      return;
+    }
+
+    const result = await pool.query<QuizRow>(
+      `
+      SELECT q.id, q.user_id, q.name, q.questions, q.created_at, q.updated_at
+      FROM quiz_shares qs
+      INNER JOIN quizzes q ON q.id = qs.quiz_id
+      WHERE qs.token = $1 AND qs.revoked_at IS NULL
+      `,
+      [shareToken],
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: "Shared quiz not found" });
+      return;
+    }
+
+    res.json(mapRowToQuiz(result.rows[0]));
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.post("/api/auth/login", async (req, res, next) => {
@@ -265,6 +329,115 @@ app.delete("/api/quizzes/:id", requireAuth, async (req, res, next) => {
       res.status(404).json({ message: "Quiz not found" });
       return;
     }
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/quizzes/:id/share", requireAuth, async (req, res, next) => {
+  try {
+    const quizId = getSingleParam(req.params.id);
+    if (!quizId) {
+      res.status(400).json({ message: "Invalid quiz id" });
+      return;
+    }
+
+    const authReq = req as AuthenticatedRequest;
+    const ownedQuiz = await findOwnedQuiz(quizId, authReq.auth.userId);
+    if (!ownedQuiz) {
+      res.status(404).json({ message: "Quiz not found" });
+      return;
+    }
+
+    const result = await pool.query<QuizShareRow>(
+      `
+      SELECT id, quiz_id, token, created_by, created_at, revoked_at
+      FROM quiz_shares
+      WHERE quiz_id = $1 AND revoked_at IS NULL
+      `,
+      [quizId],
+    );
+
+    if (result.rowCount === 0) {
+      res.json({ share: null });
+      return;
+    }
+
+    res.json({ share: mapRowToQuizShare(result.rows[0]) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/quizzes/:id/share", requireAuth, async (req, res, next) => {
+  try {
+    const quizId = getSingleParam(req.params.id);
+    if (!quizId) {
+      res.status(400).json({ message: "Invalid quiz id" });
+      return;
+    }
+
+    const authReq = req as AuthenticatedRequest;
+    const ownedQuiz = await findOwnedQuiz(quizId, authReq.auth.userId);
+    if (!ownedQuiz) {
+      res.status(404).json({ message: "Quiz not found" });
+      return;
+    }
+
+    const existing = await pool.query<QuizShareRow>(
+      `
+      SELECT id, quiz_id, token, created_by, created_at, revoked_at
+      FROM quiz_shares
+      WHERE quiz_id = $1 AND revoked_at IS NULL
+      `,
+      [quizId],
+    );
+
+    if (existing.rowCount !== 0) {
+      res.status(200).json({ share: mapRowToQuizShare(existing.rows[0]) });
+      return;
+    }
+
+    const created = await pool.query<QuizShareRow>(
+      `
+      INSERT INTO quiz_shares (id, quiz_id, token, created_by)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, quiz_id, token, created_by, created_at, revoked_at
+      `,
+      [randomUUID(), quizId, randomUUID(), authReq.auth.userId],
+    );
+
+    res.status(201).json({ share: mapRowToQuizShare(created.rows[0]) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/quizzes/:id/share", requireAuth, async (req, res, next) => {
+  try {
+    const quizId = getSingleParam(req.params.id);
+    if (!quizId) {
+      res.status(400).json({ message: "Invalid quiz id" });
+      return;
+    }
+
+    const authReq = req as AuthenticatedRequest;
+    const ownedQuiz = await findOwnedQuiz(quizId, authReq.auth.userId);
+    if (!ownedQuiz) {
+      res.status(404).json({ message: "Quiz not found" });
+      return;
+    }
+
+    await pool.query(
+      `
+      UPDATE quiz_shares
+      SET revoked_at = NOW()
+      WHERE quiz_id = $1 AND revoked_at IS NULL
+      `,
+      [quizId],
+    );
 
     res.status(204).send();
   } catch (error) {

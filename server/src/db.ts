@@ -57,4 +57,27 @@ export const initDatabase = async (): Promise<void> => {
     CREATE INDEX IF NOT EXISTS idx_quizzes_user_id_created_at
     ON quizzes (user_id, created_at);
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quiz_shares (
+      id UUID PRIMARY KEY,
+      quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      revoked_at TIMESTAMPTZ
+    );
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_quiz_shares_quiz_id_active
+    ON quiz_shares (quiz_id)
+    WHERE revoked_at IS NULL;
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_quiz_shares_token_active
+    ON quiz_shares (token)
+    WHERE revoked_at IS NULL;
+  `);
 };
