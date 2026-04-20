@@ -5,12 +5,14 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { ConnectionPanel } from "@/components/ConnectionPanel";
+import { AuthPanel } from "@/components/AuthPanel";
 import { BuzzerCard } from "@/components/BuzzerCard";
 import { BlindTestPlayer } from "@/components/BlindTestPlayer";
 import { SpotifyConfigPanel } from "@/components/SpotifyConfigPanel";
 import { QuizBuilder } from "@/components/QuizBuilder";
 import { QuizPlayer } from "@/components/QuizPlayer";
 import { useMQTT } from "@/hooks/useMQTT";
+import { useAuth } from "@/hooks/useAuth";
 import { useSpotify } from "@/hooks/useSpotify";
 import { useQuiz } from "@/hooks/useQuiz";
 import { RotateCcw, Zap, CheckCircle, XCircle, Settings, Trophy, Lock, Palette, Send, Music, ListChecks } from "lucide-react";
@@ -18,8 +20,9 @@ import { motion } from "framer-motion";
 
 const Index = () => {
   const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores, adjustScore, lockAll, publishConfig } = useMQTT();
+  const auth = useAuth();
   const spotify = useSpotify();
-  const quiz = useQuiz();
+  const quiz = useQuiz(auth.token, auth.user?.id);
   const [showConfig, setShowConfig] = useState(false);
   const [blindTestMode, setBlindTestMode] = useState(false);
   const [quizMode, setQuizMode] = useState(false);
@@ -112,12 +115,15 @@ const Index = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
         >
-          <ConnectionPanel
-            isConnected={isConnected}
-            onConnect={connect}
-            onDisconnect={disconnect}
-            extraConfig={<SpotifyConfigPanel {...spotify} />}
-          />
+          <div className="space-y-4">
+            <AuthPanel auth={auth} />
+            <ConnectionPanel
+              isConnected={isConnected}
+              onConnect={connect}
+              onDisconnect={disconnect}
+              extraConfig={<SpotifyConfigPanel {...spotify} />}
+            />
+          </div>
         </motion.div>
 
         {/* Control Panel */}
@@ -182,7 +188,7 @@ const Index = () => {
               <Label htmlFor="quizMode" className="text-sm text-foreground font-semibold cursor-pointer">
                 Mode Quiz
               </Label>
-              <Switch id="quizMode" checked={quizMode} onCheckedChange={enableQuiz} />
+              <Switch id="quizMode" checked={quizMode} onCheckedChange={enableQuiz} disabled={!auth.isAuthenticated} />
             </div>
           </motion.div>
         )}
@@ -315,6 +321,20 @@ const Index = () => {
               pause={spotify.pause}
               resume={spotify.resume}
             />
+          </motion.div>
+        )}
+
+        {isConnected && !auth.isAuthenticated && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <Card className="p-4 bg-card/50 border-border/50 backdrop-blur-sm">
+              <p className="text-sm text-muted-foreground">
+                Connecte un compte quiz pour accéder aux playlists de quiz associées à ton utilisateur.
+              </p>
+            </Card>
           </motion.div>
         )}
 

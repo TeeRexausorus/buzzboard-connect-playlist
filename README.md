@@ -87,11 +87,14 @@ API disponible sur `http://localhost:3001`.
 ### 3. Endpoints
 
 - `GET /api/health`
-- `GET /api/quizzes`
-- `GET /api/quizzes/:id`
-- `POST /api/quizzes`
-- `PATCH /api/quizzes/:id`
-- `DELETE /api/quizzes/:id`
+- `POST /api/auth/login`
+- `GET /api/quizzes` (`Authorization: Bearer <token>`)
+- `GET /api/quizzes/:id` (`Authorization: Bearer <token>`)
+- `POST /api/quizzes` (`Authorization: Bearer <token>`)
+- `PATCH /api/quizzes/:id` (`Authorization: Bearer <token>`)
+- `DELETE /api/quizzes/:id` (`Authorization: Bearer <token>`)
+
+`POST /api/auth/login` crée automatiquement le compte si le login n'existe pas encore, puis renvoie un token Bearer.
 
 Le SQL d'initialisation est dans `server/sql/001_init.sql` (la table est aussi créée automatiquement au démarrage).
 
