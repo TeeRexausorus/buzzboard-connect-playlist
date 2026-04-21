@@ -32,9 +32,21 @@ export const initDatabase = async (): Promise<void> => {
       id UUID PRIMARY KEY,
       login TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
+      access_token TEXT,
+      refresh_token TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS access_token TEXT;
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS refresh_token TEXT;
   `);
 
   await pool.query(`

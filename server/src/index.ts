@@ -4,7 +4,14 @@ import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual } from
 import { ZodError } from "zod";
 import { pool, initDatabase } from "./db";
 import { env, validateEnv } from "./env";
-import { createQuizSchema, loginSchema, shareQuizWithUserSchema, updateQuizSchema } from "./validation";
+import {
+  createQuizSchema,
+  loginSchema,
+  patchUserTokensSchema,
+  putUserTokensSchema,
+  shareQuizWithUserSchema,
+  updateQuizSchema,
+} from "./validation";
 
 type QuizRow = {
   id: string;
@@ -22,6 +29,17 @@ type UserRow = {
   id: string;
   login: string;
   password_hash: string;
+  access_token?: string | null;
+  refresh_token?: string | null;
+};
+
+type CurrentUserRow = {
+  id: string;
+  login: string;
+  access_token: string | null;
+  refresh_token: string | null;
+  created_at: Date | string;
+  updated_at: Date | string;
 };
 
 type QuizCollaboratorRow = {
@@ -49,6 +67,15 @@ const mapRowToQuizCollaborator = (row: QuizCollaboratorRow) => ({
   userId: row.user_id,
   login: row.login,
   createdAt: new Date(row.created_at).getTime(),
+});
+
+const mapRowToCurrentUser = (row: CurrentUserRow) => ({
+  id: row.id,
+  login: row.login,
+  accessToken: row.access_token,
+  refreshToken: row.refresh_token,
+  createdAt: new Date(row.created_at).getTime(),
+  updatedAt: new Date(row.updated_at).getTime(),
 });
 
 const TOKEN_SEPARATOR = ".";
@@ -165,6 +192,19 @@ const findAccessibleQuiz = async (quizId: string, userId: string): Promise<QuizR
   return result.rowCount === 0 ? null : result.rows[0];
 };
 
+const findCurrentUser = async (userId: string): Promise<CurrentUserRow | null> => {
+  const result = await pool.query<CurrentUserRow>(
+    `
+    SELECT id, login, access_token, refresh_token, created_at, updated_at
+    FROM users
+    WHERE id = $1
+    `,
+    [userId],
+  );
+
+  return result.rowCount === 0 ? null : result.rows[0];
+};
+
 const app = express();
 
 app.use(cors({ origin: env.corsOrigin === "*" ? true : env.corsOrigin }));
@@ -217,6 +257,103 @@ app.post("/api/auth/login", async (req, res, next) => {
       },
       created,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/me", requireAuth, async (req, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const user = await findCurrentUser(authReq.auth.userId);
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    res.json({ user: mapRowToCurrentUser(user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/me/tokens", requireAuth, async (req, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const user = await findCurrentUser(authReq.auth.userId);
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    res.json({
+      accessToken: user.access_token,
+      refreshToken: user.refresh_token,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/me/tokens", requireAuth, async (req, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const payload = putUserTokensSchema.parse(req.body);
+
+    const result = await pool.query<CurrentUserRow>(
+      `
+      UPDATE users
+      SET access_token = $2,
+          refresh_token = $3,
+          updated_at = NOW()
+      WHERE id = $1
+      RETURNING id, login, access_token, refresh_token, created_at, updated_at
+      `,
+      [authReq.auth.userId, payload.accessToken, payload.refreshToken],
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    res.json({ user: mapRowToCurrentUser(result.rows[0]) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch("/api/me/tokens", requireAuth, async (req, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const payload = patchUserTokensSchema.parse(req.body);
+    const hasAccessToken = payload.accessToken !== undefined;
+    const hasRefreshToken = payload.refreshToken !== undefined;
+
+    const result = await pool.query<CurrentUserRow>(
+      `
+      UPDATE users
+      SET access_token = CASE WHEN $2 THEN $3 ELSE access_token END,
+          refresh_token = CASE WHEN $4 THEN $5 ELSE refresh_token END,
+          updated_at = NOW()
+      WHERE id = $1
+      RETURNING id, login, access_token, refresh_token, created_at, updated_at
+      `,
+      [
+        authReq.auth.userId,
+        hasAccessToken,
+        payload.accessToken ?? null,
+        hasRefreshToken,
+        payload.refreshToken ?? null,
+      ],
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    res.json({ user: mapRowToCurrentUser(result.rows[0]) });
   } catch (error) {
     next(error);
   }

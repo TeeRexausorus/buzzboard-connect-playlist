@@ -150,6 +150,10 @@ Affiche 2 colonnes: `Quiz Builder` + `Quiz Player`.
 
 - `GET /api/health`
 - `POST /api/auth/login`
+- `GET /api/me` (`Authorization: Bearer <token>`)
+- `GET /api/me/tokens` (`Authorization: Bearer <token>`)
+- `PUT /api/me/tokens` (`Authorization: Bearer <token>`)
+- `PATCH /api/me/tokens` (`Authorization: Bearer <token>`)
 - `GET /api/quizzes` (`Authorization: Bearer <token>`)
 - `GET /api/quizzes/:id` (`Authorization: Bearer <token>`)
 - `POST /api/quizzes` (`Authorization: Bearer <token>`)
@@ -161,8 +165,27 @@ Affiche 2 colonnes: `Quiz Builder` + `Quiz Player`.
 
 `POST /api/auth/login` crée automatiquement le compte si le login n'existe pas encore, puis renvoie un token Bearer.
 `POST /api/quizzes/:id/share` ajoute un collaborateur à partir de son login. Un collaborateur peut lire et modifier la playlist, sans en devenir propriétaire.
+`GET /api/me` renvoie les infos du user connecté, dont `accessToken` et `refreshToken`.
 
-SQL d'initialisation: `server/sql/001_init.sql`.
+Exemples payload tokens:
+
+```json
+{
+  "accessToken": "spotify_access_token",
+  "refreshToken": "spotify_refresh_token"
+}
+```
+
+```json
+{
+  "accessToken": null
+}
+```
+
+Migrations SQL:
+
+- `server/sql/001_init.sql`
+- `server/sql/002_add_user_streaming_tokens.sql`
 
 ## Notes
 

@@ -45,6 +45,22 @@ export const shareQuizWithUserSchema = z.object({
   login: z.string().trim().min(3).max(100),
 });
 
+const tokenSchema = z.string().trim().min(1).max(4096);
+
+export const putUserTokensSchema = z.object({
+  accessToken: tokenSchema.nullable(),
+  refreshToken: tokenSchema.nullable(),
+});
+
+export const patchUserTokensSchema = z
+  .object({
+    accessToken: tokenSchema.nullable().optional(),
+    refreshToken: tokenSchema.nullable().optional(),
+  })
+  .refine((value) => value.accessToken !== undefined || value.refreshToken !== undefined, {
+    message: "At least one field must be provided",
+  });
+
 export const updateQuizSchema = z
   .object({
     name: z.string().trim().min(1).max(255).optional(),
@@ -59,3 +75,5 @@ export type CreateQuizPayload = z.infer<typeof createQuizSchema>;
 export type UpdateQuizPayload = z.infer<typeof updateQuizSchema>;
 export type LoginPayload = z.infer<typeof loginSchema>;
 export type ShareQuizWithUserPayload = z.infer<typeof shareQuizWithUserSchema>;
+export type PutUserTokensPayload = z.infer<typeof putUserTokensSchema>;
+export type PatchUserTokensPayload = z.infer<typeof patchUserTokensSchema>;
