@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "@/hooks/use-toast";
 
 const AUTH_STORAGE_KEY = "spotifyAuth";
-const CLIENT_ID_STORAGE_KEY = "spotifyClientId";
 const VERIFIER_STORAGE_KEY = "spotifyCodeVerifier";
 const SCOPES = "user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative";
+const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID?.trim() || "";
 
 interface SpotifyAuth {
   access_token: string;
@@ -58,9 +58,6 @@ const generateCodeChallenge = async (verifier: string) => {
 const getRedirectUri = () => window.location.origin + "/";
 
 export const useSpotify = () => {
-  const [clientId, setClientIdState] = useState<string>(
-    () => localStorage.getItem(CLIENT_ID_STORAGE_KEY) || ""
-  );
   const [auth, setAuth] = useState<SpotifyAuth | null>(() => {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY);
     return raw ? (JSON.parse(raw) as SpotifyAuth) : null;
@@ -78,11 +75,6 @@ export const useSpotify = () => {
 
   const isAuthed = !!auth;
 
-  const setClientId = (id: string) => {
-    setClientIdState(id);
-    localStorage.setItem(CLIENT_ID_STORAGE_KEY, id);
-  };
-
   const persistAuth = (a: SpotifyAuth | null) => {
     setAuth(a);
     if (a) localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(a));
@@ -91,8 +83,12 @@ export const useSpotify = () => {
 
   // ---------- OAuth login ----------
   const login = useCallback(async () => {
-    if (!clientId) {
-      toast({ title: "Client ID manquant", description: "Renseigne ton Client ID Spotify", variant: "destructive" });
+    if (!SPOTIFY_CLIENT_ID) {
+      toast({
+        title: "Client ID Spotify manquant",
+        description: "Configure VITE_SPOTIFY_CLIENT_ID dans les variables d'environnement frontend",
+        variant: "destructive",
+      });
       return;
     }
     const verifier = generateCodeVerifier();
@@ -100,7 +96,7 @@ export const useSpotify = () => {
     sessionStorage.setItem(VERIFIER_STORAGE_KEY, verifier);
 
     const params = new URLSearchParams({
-      client_id: clientId,
+      client_id: SPOTIFY_CLIENT_ID,
       response_type: "code",
       redirect_uri: getRedirectUri(),
       scope: SCOPES,
@@ -108,19 +104,18 @@ export const useSpotify = () => {
       code_challenge: challenge,
     });
     window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
-  }, [clientId]);
+  }, []);
 
   const exchangeCodeForToken = useCallback(
     async (code: string) => {
       const verifier = sessionStorage.getItem(VERIFIER_STORAGE_KEY);
-      const cid = localStorage.getItem(CLIENT_ID_STORAGE_KEY) || clientId;
-      if (!verifier || !cid) return;
+      if (!verifier || !SPOTIFY_CLIENT_ID) return;
 
       const body = new URLSearchParams({
         grant_type: "authorization_code",
         code,
         redirect_uri: getRedirectUri(),
-        client_id: cid,
+        client_id: SPOTIFY_CLIENT_ID,
         code_verifier: verifier,
       });
 
@@ -145,7 +140,7 @@ export const useSpotify = () => {
       sessionStorage.removeItem(VERIFIER_STORAGE_KEY);
       toast({ title: "Spotify connecté" });
     },
-    [clientId]
+    []
   );
 
   // ---------- Catch redirect on mount ----------
@@ -163,13 +158,12 @@ export const useSpotify = () => {
   // ---------- Token refresh ----------
   const refreshAccessToken = useCallback(async (): Promise<string | null> => {
     if (!auth) return null;
-    const cid = localStorage.getItem(CLIENT_ID_STORAGE_KEY) || clientId;
-    if (!cid) return null;
+    if (!SPOTIFY_CLIENT_ID) return null;
 
     const body = new URLSearchParams({
       grant_type: "refresh_token",
       refresh_token: auth.refresh_token,
-      client_id: cid,
+      client_id: SPOTIFY_CLIENT_ID,
     });
     const res = await fetch("https://accounts.spotify.com/api/token", {
       method: "POST",
@@ -188,7 +182,7 @@ export const useSpotify = () => {
     };
     persistAuth(newAuth);
     return newAuth.access_token;
-  }, [auth, clientId]);
+  }, [auth]);
 
   const getValidToken = useCallback(async (): Promise<string | null> => {
     if (!auth) return null;
@@ -384,8 +378,7 @@ export const useSpotify = () => {
   }, [isAuthed]);
 
   return {
-    clientId,
-    setClientId,
+    spotifyClientIdConfigured: Boolean(SPOTIFY_CLIENT_ID),
     isAuthed,
     login,
     logout,

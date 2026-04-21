@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -13,8 +12,7 @@ import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
 
 interface SpotifyConfigPanelProps {
-  clientId: string;
-  setClientId: (id: string) => void;
+  spotifyClientIdConfigured: boolean;
   isAuthed: boolean;
   login: () => void;
   logout: () => void;
@@ -25,8 +23,7 @@ interface SpotifyConfigPanelProps {
 }
 
 export const SpotifyConfigPanel = ({
-  clientId,
-  setClientId,
+  spotifyClientIdConfigured,
   isAuthed,
   login,
   logout,
@@ -53,46 +50,24 @@ export const SpotifyConfigPanel = ({
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Music className="w-4 h-4 text-primary" />
-        <h4 className="text-sm font-semibold text-foreground">Blind Test (Spotify)</h4>
+        <h4 className="text-sm font-semibold text-foreground">Blind Test</h4>
       </div>
 
       {!isAuthed ? (
         <div className="space-y-3">
-          <div>
-            <Label htmlFor="spotifyClientId" className="text-sm text-foreground">
-              Spotify Client ID
-            </Label>
-            <Input
-              id="spotifyClientId"
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              placeholder="Ton Client ID depuis developer.spotify.com"
-              className="bg-input border-border text-foreground mt-1"
-            />
-            <div className="mt-2 space-y-1">
-              <Label className="text-xs text-muted-foreground">Redirect URI à déclarer dans Spotify</Label>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-xs text-primary bg-muted px-2 py-1.5 rounded border border-border break-all">
-                  {redirectUri}
-                </code>
-                <Button
-                  type="button"
-                  onClick={copyRedirectUri}
-                  variant="outline"
-                  size="sm"
-                  className="bg-card border-border hover:bg-muted shrink-0"
-                >
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                💡 Pour usage local : sers l'UI en HTTP et déclare{" "}
-                <code className="text-primary">http://127.0.0.1:PORT/</code> comme redirect URI Spotify (loopback
-                autorisé sans HTTPS).
+          <div className="mt-2 space-y-1">
+            {!spotifyClientIdConfigured && (
+              <p className="text-xs text-destructive">
+                Variable frontend manquante: <code>VITE_SPOTIFY_CLIENT_ID</code>
               </p>
-            </div>
+            )}
           </div>
-          <Button onClick={login} disabled={!clientId} size="sm" className="bg-primary hover:bg-primary/90">
+          <Button
+            onClick={login}
+            disabled={!spotifyClientIdConfigured}
+            size="sm"
+            className="bg-primary hover:bg-primary/90"
+          >
             Connecter Spotify
           </Button>
         </div>

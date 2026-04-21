@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       "/api": {
-        target: "http://localhost:3001",
+        target: "https://quizz-playlist-backend-3a9f100969b9.herokuapp.com",
         changeOrigin: true,
       },
     },

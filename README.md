@@ -42,6 +42,7 @@ Variables utiles:
 - `BACKEND_PORT` (défaut: `3001`)
 - `CORS_ORIGIN` (recommandé en dev: `http://localhost:5173`)
 - `VITE_API_BASE_URL` (optionnel en prod)
+- `VITE_SPOTIFY_CLIENT_ID` (obligatoire pour l'auth Spotify côté frontend)
 
 ## UI: guide rapide
 
