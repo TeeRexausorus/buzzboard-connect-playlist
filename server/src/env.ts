@@ -17,8 +17,9 @@ const parseBoolean = (value: string | undefined): boolean | undefined => {
 
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
-  port: parseIntOrDefault(process.env.BACKEND_PORT, 3001),
+  port: parseIntOrDefault(process.env.PORT ?? process.env.BACKEND_PORT, 3001),
   corsOrigin: process.env.CORS_ORIGIN ?? "*",
+  authSecret: process.env.AUTH_SECRET ?? "dev-only-auth-secret-change-me",
   databaseUrl: process.env.DATABASE_URL,
   dbHost: process.env.DB_HOST,
   dbPort: parseIntOrDefault(process.env.DB_PORT, 5432),
@@ -30,6 +31,10 @@ export const env = {
 };
 
 export const validateEnv = (): void => {
+  if (env.nodeEnv === "production" && env.authSecret === "dev-only-auth-secret-change-me") {
+    throw new Error("Missing AUTH_SECRET in production.");
+  }
+
   if (env.databaseUrl) return;
 
   const missing = ["DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD"].filter(

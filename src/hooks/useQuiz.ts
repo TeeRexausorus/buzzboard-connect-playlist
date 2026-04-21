@@ -35,6 +35,8 @@ export interface Quiz {
   id: string;
   name: string;
   questions: Question[];
+  access?: "owned" | "shared";
+  ownerLogin?: string | null;
   createdAt: number;
   updatedAt?: number;
 }
@@ -42,6 +44,7 @@ export interface Quiz {
 const QUIZZES_KEY = "quizzes";
 const ACTIVE_KEY = "activeQuizId";
 const RUNTIME_KEY = "quizRuntime"; // { index, revealed }
+const QUIZ_CACHE_PREFIX = "quizzesCache";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() || "";
 
@@ -54,9 +57,9 @@ const uid = () => {
   return `${hex()}-${hex().slice(0, 4)}-4${hex().slice(0, 3)}-a${hex().slice(0, 3)}-${hex()}${hex().slice(0, 4)}`;
 };
 
-const loadQuizzes = (): Quiz[] => {
+const loadQuizzes = (storageKey: string): Quiz[] => {
   try {
-    const raw = localStorage.getItem(QUIZZES_KEY);
+    const raw = localStorage.getItem(storageKey);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -75,32 +78,46 @@ const readJson = async <T>(response: Response): Promise<T> => {
 
 const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
 
+const buildHeaders = (token?: string | null): HeadersInit => {
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+};
+
 const api = {
-  getQuizzes: async (): Promise<Quiz[]> => {
-    const response = await fetch(apiUrl("/api/quizzes"));
+  getQuizzes: async (token: string): Promise<Quiz[]> => {
+    const response = await fetch(apiUrl("/api/quizzes"), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return readJson<Quiz[]>(response);
   },
-  createQuiz: async (payload: { name: string; questions: Question[] }): Promise<Quiz> => {
+  createQuiz: async (token: string, payload: { name: string; questions: Question[] }): Promise<Quiz> => {
     const response = await fetch(apiUrl("/api/quizzes"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: buildHeaders(token),
       body: JSON.stringify(payload),
     });
     return readJson<Quiz>(response);
   },
   updateQuiz: async (
+    token: string,
     id: string,
     payload: { name?: string; questions?: Question[] },
   ): Promise<Quiz> => {
     const response = await fetch(apiUrl(`/api/quizzes/${id}`), {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: buildHeaders(token),
       body: JSON.stringify(payload),
     });
     return readJson<Quiz>(response);
   },
-  deleteQuiz: async (id: string): Promise<void> => {
-    const response = await fetch(apiUrl(`/api/quizzes/${id}`), { method: "DELETE" });
+  deleteQuiz: async (token: string, id: string): Promise<void> => {
+    const response = await fetch(apiUrl(`/api/quizzes/${id}`), {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (!response.ok) {
       const text = await response.text();
       throw new Error(text || `HTTP ${response.status}`);
@@ -108,18 +125,31 @@ const api = {
   },
 };
 
-export const useQuiz = () => {
-  const [quizzes, setQuizzes] = useState<Quiz[]>(() => loadQuizzes());
+export const useQuiz = (token?: string | null, userId?: string | null) => {
+  const cacheKey = userId ? `${QUIZ_CACHE_PREFIX}:${userId}` : null;
+  const [quizzes, setQuizzes] = useState<Quiz[]>(() => (cacheKey ? loadQuizzes(cacheKey) : []));
   const [activeQuizId, setActiveQuizId] = useState<string>(() => localStorage.getItem(ACTIVE_KEY) || "");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [usingApi, setUsingApi] = useState(true);
-  const initializedRef = useRef(false);
+  const previousCacheKeyRef = useRef<string | null>(cacheKey);
 
-  // Persist quizzes locally as offline cache/fallback.
   useEffect(() => {
     localStorage.setItem(QUIZZES_KEY, JSON.stringify(quizzes));
-  }, [quizzes]);
+    if (cacheKey) {
+      localStorage.setItem(cacheKey, JSON.stringify(quizzes));
+    }
+  }, [cacheKey, quizzes]);
+
+  useEffect(() => {
+    if (previousCacheKeyRef.current && previousCacheKeyRef.current !== cacheKey) {
+      setQuizzes(cacheKey ? loadQuizzes(cacheKey) : []);
+      setActiveQuizId("");
+      setCurrentIndex(0);
+      setRevealed(false);
+    }
+    previousCacheKeyRef.current = cacheKey;
+  }, [cacheKey]);
 
   useEffect(() => {
     if (activeQuizId) localStorage.setItem(ACTIVE_KEY, activeQuizId);
@@ -148,8 +178,8 @@ export const useQuiz = () => {
     });
   }, []);
 
-  const syncFromApi = useCallback(async () => {
-    const remoteQuizzes = await api.getQuizzes();
+  const syncFromApi = useCallback(async (authToken: string) => {
+    const remoteQuizzes = await api.getQuizzes(authToken);
     setQuizzes(remoteQuizzes);
 
     if (remoteQuizzes.length === 0) {
@@ -164,22 +194,38 @@ export const useQuiz = () => {
   }, []);
 
   useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
+    if (!token) {
+      setUsingApi(false);
+      setQuizzes([]);
+      setActiveQuizId("");
+      setCurrentIndex(0);
+      setRevealed(false);
+      return;
+    }
 
-    const boot = async () => {
+    const reload = async () => {
       try {
-        await syncFromApi();
+        await syncFromApi(token);
         setUsingApi(true);
       } catch (error) {
         console.warn("Quiz backend unavailable, fallback to localStorage", error);
         setUsingApi(false);
+        if (cacheKey) {
+          const cachedQuizzes = loadQuizzes(cacheKey);
+          if (cachedQuizzes.length > 0) {
+            setQuizzes(cachedQuizzes);
+            setActiveQuizId((prev) =>
+              prev && cachedQuizzes.some((quiz) => quiz.id === prev) ? prev : (cachedQuizzes[0]?.id ?? ""),
+            );
+            return;
+          }
+        }
         ensureDefaultQuiz();
       }
     };
 
-    void boot();
-  }, [ensureDefaultQuiz, syncFromApi]);
+    void reload();
+  }, [cacheKey, ensureDefaultQuiz, syncFromApi, token]);
 
   useEffect(() => {
     if (quizzes.length === 0) return;
@@ -206,17 +252,18 @@ export const useQuiz = () => {
   }, [activeQuizId]);
 
   const persistActiveQuizToApi = useCallback(async (quizId: string, nextQuestions: Question[]) => {
-    if (!usingApi) return;
+    if (!usingApi || !token) return;
     try {
-      const updated = await api.updateQuiz(quizId, { questions: nextQuestions });
+      const updated = await api.updateQuiz(token, quizId, { questions: nextQuestions });
       setQuizzes((prev) => prev.map((q) => (q.id === quizId ? updated : q)));
     } catch (error) {
       console.warn("Failed to persist questions to API, switching to local fallback", error);
       setUsingApi(false);
     }
-  }, [usingApi]);
+  }, [token, usingApi]);
 
   const createQuiz = useCallback((name: string) => {
+    if (!token) return "";
     const normalizedName = name.trim() || "Nouveau quiz";
     const optimisticQuiz: Quiz = {
       id: uid(),
@@ -233,7 +280,7 @@ export const useQuiz = () => {
 
     if (usingApi) {
       void api
-        .createQuiz({ name: normalizedName, questions: [] })
+        .createQuiz(token, { name: normalizedName, questions: [] })
         .then((created) => {
           setQuizzes((prev) => prev.map((q) => (q.id === optimisticQuiz.id ? created : q)));
           setActiveQuizId((prevId) => (prevId === optimisticQuiz.id ? created.id : prevId));
@@ -245,7 +292,7 @@ export const useQuiz = () => {
     }
 
     return optimisticQuiz.id;
-  }, [usingApi]);
+  }, [token, usingApi]);
 
   const renameQuiz = useCallback((id: string, name: string) => {
     const normalizedName = name.trim();
@@ -254,14 +301,14 @@ export const useQuiz = () => {
     const previous = quizzes;
     setQuizzes((prev) => prev.map((q) => (q.id === id ? { ...q, name: normalizedName } : q)));
 
-    if (usingApi) {
-      void api.updateQuiz(id, { name: normalizedName }).catch((error) => {
+    if (usingApi && token) {
+      void api.updateQuiz(token, id, { name: normalizedName }).catch((error) => {
         console.warn("Failed to rename quiz on API, reverting local state", error);
         setQuizzes(previous);
         setUsingApi(false);
       });
     }
-  }, [quizzes, usingApi]);
+  }, [quizzes, token, usingApi]);
 
   const duplicateQuiz = useCallback((id: string) => {
     const source = quizzes.find((q) => q.id === id);
@@ -284,7 +331,7 @@ export const useQuiz = () => {
 
     if (usingApi) {
       void api
-        .createQuiz({ name: duplicatedName, questions: duplicatedQuestions })
+        .createQuiz(token!, { name: duplicatedName, questions: duplicatedQuestions })
         .then((created) => {
           setQuizzes((prev) => prev.map((q) => (q.id === optimisticQuiz.id ? created : q)));
           setActiveQuizId((prevId) => (prevId === optimisticQuiz.id ? created.id : prevId));
@@ -294,7 +341,7 @@ export const useQuiz = () => {
           setUsingApi(false);
         });
     }
-  }, [quizzes, usingApi]);
+  }, [quizzes, token, usingApi]);
 
   const deleteQuiz = useCallback((id: string) => {
     const previous = quizzes;
@@ -308,14 +355,14 @@ export const useQuiz = () => {
       return next;
     });
 
-    if (usingApi) {
-      void api.deleteQuiz(id).catch((error) => {
+    if (usingApi && token) {
+      void api.deleteQuiz(token, id).catch((error) => {
         console.warn("Failed to delete quiz on API, reverting local state", error);
         setQuizzes(previous);
         setUsingApi(false);
       });
     }
-  }, [activeQuizId, quizzes, usingApi]);
+  }, [activeQuizId, quizzes, token, usingApi]);
 
   const selectQuiz = useCallback((id: string) => {
     setActiveQuizId(id);
