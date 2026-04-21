@@ -220,7 +220,7 @@ app.post("/api/auth/login", async (req, res, next) => {
     const normalizedLogin = payload.login.trim().toLowerCase();
 
     const existing = await pool.query<UserRow>(
-      "SELECT id, login, password_hash FROM users WHERE login = $1",
+      "SELECT id, login, password_hash, access_token, refresh_token FROM users WHERE login = $1",
       [normalizedLogin],
     );
 
@@ -232,7 +232,7 @@ app.post("/api/auth/login", async (req, res, next) => {
         `
         INSERT INTO users (id, login, password_hash)
         VALUES ($1, $2, $3)
-        RETURNING id, login, password_hash
+        RETURNING id, login, password_hash, access_token, refresh_token
         `,
         [randomUUID(), normalizedLogin, hashPassword(payload.password)],
       );
@@ -255,6 +255,8 @@ app.post("/api/auth/login", async (req, res, next) => {
         id: user.id,
         login: user.login,
       },
+      ...(user.access_token ? { accessToken: user.access_token } : {}),
+      ...(user.refresh_token ? { refreshToken: user.refresh_token } : {}),
       created,
     });
   } catch (error) {
