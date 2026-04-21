@@ -1,82 +1,28 @@
-# Welcome to your Lovable project
+# Buzzboard Connect Playlist
 
-## Project info
+Application web de régie pour piloter des buzzers MQTT, gérer un blind test Spotify et jouer des quiz (texte, image, musique) avec un affichage public synchronisé.
 
-**URL**: https://lovable.dev/projects/bc3c4584-e13e-4e23-b0de-d485aac58ce4
-
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/bc3c4584-e13e-4e23-b0de-d485aac58ce4) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
+## Stack
 
 - Vite
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
+- Backend Node.js + PostgreSQL (API quiz)
 
-## Backend Quiz (PostgreSQL)
+## Démarrage rapide
 
-Le projet inclut maintenant un backend API pour lire/écrire les quizzes.
+### Frontend
 
-### 1. Configuration
+```sh
+npm install
+npm run dev
+```
 
-Copiez `.env.example` vers `.env` et renseignez les variables PostgreSQL:
+UI disponible sur `http://localhost:5173`.
 
-- `DATABASE_URL` (option DSN unique), ou
-- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSL`
-
-Variables utiles:
-
-- `BACKEND_PORT` (défaut `3001`)
-- `CORS_ORIGIN` (défaut `*`, recommandé `http://localhost:5173` en dev)
-
-### 2. Lancer le backend
+### Backend API (quiz)
 
 ```sh
 npm run server:dev
@@ -84,7 +30,123 @@ npm run server:dev
 
 API disponible sur `http://localhost:3001`.
 
-### 3. Endpoints
+## Configuration backend
+
+Copier `.env.example` vers `.env`, puis renseigner PostgreSQL:
+
+- `DATABASE_URL` (DSN complet), ou
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_SSL`
+
+Variables utiles:
+
+- `BACKEND_PORT` (défaut: `3001`)
+- `CORS_ORIGIN` (recommandé en dev: `http://localhost:5173`)
+- `VITE_API_BASE_URL` (optionnel en prod)
+
+## UI: guide rapide
+
+L’interface est organisée autour de 2 écrans:
+
+- `/` : écran régie (animateur)
+- `/display` : écran public (projecteur / TV)
+
+### 1. Écran régie (`/`)
+
+#### En-tête et état de connexion
+
+- Badge `Connecté / Déconnecté`
+- Bouton `Connecter / Déconnecter`
+- Bouton `Configurer` pour ouvrir le panneau MQTT
+
+#### Panneau de connexion MQTT
+
+- `Broker URL` (ex: `ws://localhost:9001/`)
+- `Topic` (défaut: `buzzers/#`)
+- `Username / Password` optionnels
+- Bloc Spotify intégré (auth + device) dans le même panneau
+
+#### Contrôles globaux (visibles quand connecté)
+
+- `Correct`: valide le buzzer pressé, attribue les points
+- `Faux`: invalide la réponse, relance la lecture audio si besoin
+- `Reset All Buzzers`: réinitialise les états de buzzers
+- `Lock All`: verrouille tous les buzzers
+- `Config`: ouvre/ferme les réglages avancés
+- `Mode Blind Test` (si Spotify connecté)
+- `Mode Quiz`
+
+#### Grille des buzzers
+
+Chaque carte buzzer affiche:
+
+- Nom modifiable
+- État: `En attente`, `Pressé`, `Bloqué`, ou `Verrouillé`
+- Score + boutons `+/-`
+- Heure de pression quand actif
+- Bouton lock/unlock individuel
+
+#### Panneau Config (bouton `Config`)
+
+- Valeur d’un point
+- `RAZ Scores`
+- Configuration LEDs envoyée via MQTT:
+  - `blocked_color`
+  - `valid_color`
+  - `idle` (rainbow ou couleur fixe)
+
+### 2. Mode Blind Test
+
+Quand activé:
+
+- Sélection d’une playlist Spotify
+- Bouton `Suivant` pour enchaîner
+- Recherche manuelle de morceaux
+- Bloc “Morceau en cours” avec masquage/révélation (`?` / infos)
+- Contrôles `Pause` / `Lecture`
+
+Comportement automatique:
+
+- Si un buzzer est pressé pendant une question musicale: la lecture se met en pause
+- `Correct` passe au morceau suivant (si playlist sélectionnée)
+
+### 3. Mode Quiz
+
+Affiche 2 colonnes: `Quiz Builder` + `Quiz Player`.
+
+#### Quiz Builder (création)
+
+- Créer, sélectionner, renommer, dupliquer, supprimer un quiz
+- Ajouter des questions:
+  - `Texte` (question + réponse optionnelle)
+  - `Image` (URL + prompt + réponse)
+  - `Musique` (recherche Spotify)
+- Réordonner, modifier, supprimer les questions
+
+#### Quiz Player (pilotage)
+
+- Navigation `Précédent / Suivant`
+- `Révéler / Cacher` la réponse
+- Barre de progression
+- Bouton `Affichage public` (ouvre `/display`)
+- `Recommencer` pour relancer le run
+- Raccourcis clavier:
+  - `ArrowRight`: question suivante
+  - `ArrowLeft`: question précédente
+  - `R`: révéler/cacher
+
+### 4. Affichage public (`/display`)
+
+Écran lecture seule synchronisé automatiquement avec la régie:
+
+- Nom du quiz actif
+- Index question (`n / total`) + barre de progression
+- Rendu adapté au type de question:
+  - Texte
+  - Image
+  - Musique
+- Réponse/infos masquées tant que non révélées
+
+## API backend
 
 - `GET /api/health`
 - `GET /api/quizzes`
@@ -93,12 +155,9 @@ API disponible sur `http://localhost:3001`.
 - `PATCH /api/quizzes/:id`
 - `DELETE /api/quizzes/:id`
 
-Le SQL d'initialisation est dans `server/sql/001_init.sql` (la table est aussi créée automatiquement au démarrage).
+SQL d'initialisation: `server/sql/001_init.sql`.
 
-### 4. Front connecté au backend
+## Notes
 
-Le hook `useQuiz` appelle maintenant l'API `/api/quizzes`.
-
-- En dev, Vite proxy automatiquement `/api` vers `http://localhost:3001`.
-- En production, vous pouvez définir `VITE_API_BASE_URL` (ex: `https://api.mon-domaine.com`) pour préfixer les appels.
-- Si le backend est indisponible, le front bascule en fallback `localStorage`.
+- En dev, le frontend proxy `/api` vers `http://localhost:3001`.
+- Si le backend est indisponible, le front peut basculer en fallback `localStorage` pour les quiz.
