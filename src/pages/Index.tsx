@@ -21,7 +21,7 @@ import { motion } from "framer-motion";
 const Index = () => {
   const { isConnected, buzzers, pressedBuzzerId, pointValue, connect, disconnect, reset, renameBuzzer, toggleLock, handleCorrect, handleWrong, updatePointValue, resetScores, adjustScore, lockAll, publishConfig } = useMQTT();
   const auth = useAuth();
-  const spotify = useSpotify();
+  const spotify = useSpotify(auth.spotifyTokens, auth.token);
   const quiz = useQuiz(auth.token, auth.user?.id);
   const [showConfig, setShowConfig] = useState(false);
   const [blindTestMode, setBlindTestMode] = useState(false);

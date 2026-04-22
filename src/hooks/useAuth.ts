@@ -10,10 +10,16 @@ type AuthState = {
     id: string;
     login: string;
   };
+  spotifyTokens?: {
+    accessToken: string;
+    refreshToken: string;
+  } | null;
 };
 
 type LoginResponse = AuthState & {
   created: boolean;
+  accessToken?: string;
+  refreshToken?: string;
 };
 
 const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
@@ -64,10 +70,18 @@ export const useAuth = () => {
       }
 
       const nextAuth = (await response.json()) as LoginResponse;
+      const spotifyTokens =
+        nextAuth.accessToken && nextAuth.refreshToken
+          ? {
+              accessToken: nextAuth.accessToken,
+              refreshToken: nextAuth.refreshToken,
+            }
+          : null;
       const persisted = {
         token: nextAuth.token,
         expiresAt: nextAuth.expiresAt,
         user: nextAuth.user,
+        spotifyTokens,
       };
       setAuth(persisted);
       return nextAuth;
@@ -84,6 +98,7 @@ export const useAuth = () => {
     auth,
     token: auth?.token ?? null,
     user: auth?.user ?? null,
+    spotifyTokens: auth?.spotifyTokens ?? null,
     isAuthenticated: !!auth,
     isLoading,
     login,

@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "@/hooks/use-toast";
 
 const AUTH_STORAGE_KEY = "spotifyAuth";
 const VERIFIER_STORAGE_KEY = "spotifyCodeVerifier";
-const SCOPES = "user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative";
+const SCOPES =
+  "streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative";
 const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID?.trim() || "";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() || "";
 
 interface SpotifyAuth {
   access_token: string;
@@ -37,6 +39,26 @@ export interface SpotifyPlaylist {
   owner: { display_name: string };
 }
 
+type SpotifyWebPlayer = {
+  connect: () => Promise<boolean>;
+  disconnect: () => void;
+  addListener: (event: string, cb: (payload?: unknown) => void) => void;
+  removeListener: (event: string) => void;
+};
+
+declare global {
+  interface Window {
+    Spotify?: {
+      Player: new (options: {
+        name: string;
+        getOAuthToken: (cb: (token: string) => void) => void;
+        volume?: number;
+      }) => SpotifyWebPlayer;
+    };
+    onSpotifyWebPlaybackSDKReady?: () => void;
+  }
+}
+
 // ---------- PKCE helpers ----------
 const base64url = (bytes: ArrayBuffer) => {
   const bin = String.fromCharCode(...new Uint8Array(bytes));
@@ -57,7 +79,12 @@ const generateCodeChallenge = async (verifier: string) => {
 
 const getRedirectUri = () => window.location.origin + "/";
 
-export const useSpotify = () => {
+type InitialSpotifyTokens = {
+  accessToken: string;
+  refreshToken: string;
+} | null;
+
+export const useSpotify = (initialTokens: InitialSpotifyTokens = null, quizAuthToken: string | null = null) => {
   const [auth, setAuth] = useState<SpotifyAuth | null>(() => {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY);
     return raw ? (JSON.parse(raw) as SpotifyAuth) : null;
@@ -72,6 +99,10 @@ export const useSpotify = () => {
     () => localStorage.getItem("spotifyPlaylistId") || ""
   );
   const [playlistQueue, setPlaylistQueue] = useState<SpotifyTrack[]>([]);
+  const refreshInFlightRef = useRef<Promise<string | null> | null>(null);
+  const sdkLoadPromiseRef = useRef<Promise<void> | null>(null);
+  const webPlayerRef = useRef<SpotifyWebPlayer | null>(null);
+  const [browserDeviceId, setBrowserDeviceId] = useState<string>("");
 
   const isAuthed = !!auth;
 
@@ -80,6 +111,71 @@ export const useSpotify = () => {
     if (a) localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(a));
     else localStorage.removeItem(AUTH_STORAGE_KEY);
   };
+
+  const syncTokensToBackend = useCallback(
+    async (nextAuth: SpotifyAuth) => {
+      if (!quizAuthToken) return;
+      try {
+        await fetch(`${API_BASE_URL}/api/me/tokens`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${quizAuthToken}`,
+          },
+          body: JSON.stringify({
+            accessToken: nextAuth.access_token,
+            refreshToken: nextAuth.refresh_token,
+          }),
+        });
+      } catch (error) {
+        console.error("Failed to sync Spotify tokens to backend", error);
+      }
+    },
+    [quizAuthToken]
+  );
+
+  const loadSpotifySdk = useCallback(async (): Promise<void> => {
+    if (window.Spotify) return;
+    if (sdkLoadPromiseRef.current) {
+      await sdkLoadPromiseRef.current;
+      return;
+    }
+
+    sdkLoadPromiseRef.current = new Promise<void>((resolve, reject) => {
+      const existing = document.getElementById("spotify-web-playback-sdk");
+      if (existing) {
+        const waitForSdk = () => {
+          if (window.Spotify) {
+            resolve();
+            return;
+          }
+          window.setTimeout(waitForSdk, 50);
+        };
+        waitForSdk();
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.id = "spotify-web-playback-sdk";
+      script.src = "https://sdk.scdn.co/spotify-player.js";
+      script.async = true;
+      script.onerror = () => reject(new Error("Failed to load Spotify Web Playback SDK"));
+      window.onSpotifyWebPlaybackSDKReady = () => resolve();
+      document.body.appendChild(script);
+    });
+
+    await sdkLoadPromiseRef.current;
+  }, []);
+
+  useEffect(() => {
+    if (auth || !initialTokens?.accessToken || !initialTokens.refreshToken) return;
+    // Force a refresh on first API call because we don't persist token expiry server-side.
+    persistAuth({
+      access_token: initialTokens.accessToken,
+      refresh_token: initialTokens.refreshToken,
+      expires_at: Date.now() - 1,
+    });
+  }, [auth, initialTokens]);
 
   // ---------- OAuth login ----------
   const login = useCallback(async () => {
@@ -137,10 +233,11 @@ export const useSpotify = () => {
         expires_at: Date.now() + data.expires_in * 1000,
       };
       persistAuth(newAuth);
+      await syncTokensToBackend(newAuth);
       sessionStorage.removeItem(VERIFIER_STORAGE_KEY);
       toast({ title: "Spotify connecté" });
     },
-    []
+    [syncTokensToBackend]
   );
 
   // ---------- Catch redirect on mount ----------
@@ -157,32 +254,48 @@ export const useSpotify = () => {
 
   // ---------- Token refresh ----------
   const refreshAccessToken = useCallback(async (): Promise<string | null> => {
-    if (!auth) return null;
-    if (!SPOTIFY_CLIENT_ID) return null;
-
-    const body = new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: auth.refresh_token,
-      client_id: SPOTIFY_CLIENT_ID,
-    });
-    const res = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-    });
-    if (!res.ok) {
-      persistAuth(null);
-      return null;
+    if (refreshInFlightRef.current) {
+      return await refreshInFlightRef.current;
     }
-    const data = await res.json();
-    const newAuth: SpotifyAuth = {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token || auth.refresh_token,
-      expires_at: Date.now() + data.expires_in * 1000,
-    };
-    persistAuth(newAuth);
-    return newAuth.access_token;
-  }, [auth]);
+
+    const refreshPromise = (async (): Promise<string | null> => {
+      if (!auth) return null;
+      if (!SPOTIFY_CLIENT_ID) return null;
+
+      const body = new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: auth.refresh_token,
+        client_id: SPOTIFY_CLIENT_ID,
+      });
+      const res = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+      });
+      if (!res.ok) {
+        persistAuth(null);
+        return null;
+      }
+      const data = await res.json();
+      const newAuth: SpotifyAuth = {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token || auth.refresh_token,
+        expires_at: Date.now() + data.expires_in * 1000,
+      };
+      persistAuth(newAuth);
+      await syncTokensToBackend(newAuth);
+      return newAuth.access_token;
+    })();
+
+    refreshInFlightRef.current = refreshPromise;
+    try {
+      return await refreshPromise;
+    } finally {
+      if (refreshInFlightRef.current === refreshPromise) {
+        refreshInFlightRef.current = null;
+      }
+    }
+  }, [auth, syncTokensToBackend]);
 
   const getValidToken = useCallback(async (): Promise<string | null> => {
     if (!auth) return null;
@@ -207,26 +320,115 @@ export const useSpotify = () => {
     [getValidToken]
   );
 
+  const transferPlayback = useCallback(
+    async (deviceId: string, play = false): Promise<boolean> => {
+      const token = await getValidToken();
+      if (!token) return false;
+
+      const res = await fetch("https://api.spotify.com/v1/me/player", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          device_ids: [deviceId],
+          play,
+        }),
+      });
+
+      return res.ok || res.status === 204;
+    },
+    [getValidToken]
+  );
+
+  const ensureWebPlaybackDevice = useCallback(async () => {
+    if (!isAuthed) return;
+    if (webPlayerRef.current) return;
+
+    try {
+      await loadSpotifySdk();
+      if (!window.Spotify) return;
+
+      const player = new window.Spotify.Player({
+        name: "Cette page",
+        getOAuthToken: (cb) => {
+          void getValidToken().then((token) => {
+            if (token) cb(token);
+          });
+        },
+        volume: 0.8,
+      });
+
+      player.addListener("ready", ({ device_id }: { device_id: string }) => {
+        setBrowserDeviceId(device_id);
+        if (!selectedDeviceId) {
+          setSelectedDeviceId(device_id);
+          localStorage.setItem("spotifyDeviceId", device_id);
+        }
+        void transferPlayback(device_id, false);
+      });
+
+      player.addListener("not_ready", () => {
+        setBrowserDeviceId("");
+      });
+
+      player.addListener("initialization_error", ({ message }: { message: string }) => {
+        console.error("Spotify SDK initialization error", message);
+      });
+      player.addListener("authentication_error", ({ message }: { message: string }) => {
+        console.error("Spotify SDK authentication error", message);
+      });
+      player.addListener("account_error", ({ message }: { message: string }) => {
+        console.error("Spotify SDK account error", message);
+      });
+
+      const connected = await player.connect();
+      if (connected) {
+        webPlayerRef.current = player;
+      }
+    } catch (error) {
+      console.error("Failed to initialize Spotify Web Playback SDK", error);
+    }
+  }, [isAuthed, loadSpotifySdk, getValidToken, selectedDeviceId, transferPlayback]);
+
   // ---------- API ----------
   const fetchDevices = useCallback(async () => {
     try {
       const res = await apiFetch("/me/player/devices");
       if (!res.ok) return;
       const data = await res.json();
-      setDevices(data.devices || []);
-      if (!selectedDeviceId && data.devices?.length) {
-        const active = data.devices.find((d: SpotifyDevice) => d.is_active) || data.devices[0];
+      const apiDevices = (data.devices || []) as SpotifyDevice[];
+      const hasBrowserDevice = browserDeviceId && apiDevices.some((d) => d.id === browserDeviceId);
+      const mergedDevices = hasBrowserDevice
+        ? apiDevices
+        : browserDeviceId
+          ? [
+              {
+                id: browserDeviceId,
+                name: "Ce navigateur",
+                type: "Computer",
+                is_active: selectedDeviceId === browserDeviceId,
+              },
+              ...apiDevices,
+            ]
+          : apiDevices;
+
+      setDevices(mergedDevices);
+      if (!selectedDeviceId && mergedDevices.length) {
+        const active = mergedDevices.find((d) => d.is_active) || mergedDevices[0];
         setSelectedDeviceId(active.id);
         localStorage.setItem("spotifyDeviceId", active.id);
       }
     } catch (e) {
       console.error(e);
     }
-  }, [apiFetch, selectedDeviceId]);
+  }, [apiFetch, selectedDeviceId, browserDeviceId]);
 
   const selectDevice = (id: string) => {
     setSelectedDeviceId(id);
     localStorage.setItem("spotifyDeviceId", id);
+    void transferPlayback(id, false);
   };
 
   const search = useCallback(
@@ -353,7 +555,10 @@ export const useSpotify = () => {
   }, [apiFetch, isAuthed, selectedDeviceId]);
 
   const logout = () => {
+    webPlayerRef.current?.disconnect();
+    webPlayerRef.current = null;
     persistAuth(null);
+    setBrowserDeviceId("");
     setCurrentTrack(null);
     setDevices([]);
     setPlaylists([]);
@@ -363,11 +568,25 @@ export const useSpotify = () => {
   // Auto-fetch devices + playlists once authed
   useEffect(() => {
     if (isAuthed) {
+      ensureWebPlaybackDevice();
       fetchDevices();
       fetchPlaylists();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthed]);
+
+  useEffect(() => {
+    if (!isAuthed || !browserDeviceId) return;
+    fetchDevices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [browserDeviceId, isAuthed]);
+
+  useEffect(() => {
+    return () => {
+      webPlayerRef.current?.disconnect();
+      webPlayerRef.current = null;
+    };
+  }, []);
 
   // Reload queue if a playlist was previously selected
   useEffect(() => {
