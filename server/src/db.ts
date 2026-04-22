@@ -31,12 +31,34 @@ export const initDatabase = async (): Promise<void> => {
     CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY,
       login TEXT NOT NULL UNIQUE,
+      email TEXT UNIQUE,
       password_hash TEXT NOT NULL,
       access_token TEXT,
       refresh_token TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS email TEXT;
+  `);
+
+  await pool.query(`
+    UPDATE users
+    SET email = login
+    WHERE email IS NULL;
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+    ALTER COLUMN email SET NOT NULL;
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique
+    ON users (email);
   `);
 
   await pool.query(`

@@ -8,7 +8,7 @@ type AuthState = {
   expiresAt: number;
   user: {
     id: string;
-    login: string;
+    email: string;
   };
   spotifyTokens?: {
     accessToken: string;
@@ -28,12 +28,19 @@ const readStoredAuth = (): AuthState | null => {
   try {
     const raw = localStorage.getItem(AUTH_STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as AuthState;
-    if (!parsed?.token || !parsed?.user?.id || parsed.expiresAt <= Date.now()) {
+    const parsed = JSON.parse(raw) as AuthState & { user?: { id?: string; email?: string; login?: string } };
+    const email = parsed?.user?.email ?? parsed?.user?.login;
+    if (!parsed?.token || !parsed?.user?.id || !email || parsed.expiresAt <= Date.now()) {
       localStorage.removeItem(AUTH_STORAGE_KEY);
       return null;
     }
-    return parsed;
+    return {
+      ...parsed,
+      user: {
+        id: parsed.user.id,
+        email,
+      },
+    };
   } catch {
     localStorage.removeItem(AUTH_STORAGE_KEY);
     return null;
@@ -52,14 +59,14 @@ export const useAuth = () => {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
   }, [auth]);
 
-  const login = useCallback(async (loginValue: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
       const response = await fetch(apiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          login: loginValue.trim(),
+          email: email.trim(),
           password,
         }),
       });

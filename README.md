@@ -162,10 +162,10 @@ Affiche 2 colonnes: `Quiz Builder` + `Quiz Player`.
 - `DELETE /api/quizzes/:id` (`Authorization: Bearer <token>`)
 - `GET /api/quizzes/:id/share` (`Authorization: Bearer <token>`)
 - `POST /api/quizzes/:id/share` (`Authorization: Bearer <token>`)
-- `DELETE /api/quizzes/:id/share/:login` (`Authorization: Bearer <token>`)
+- `DELETE /api/quizzes/:id/share/:email` (`Authorization: Bearer <token>`)
 
-`POST /api/auth/login` crée automatiquement le compte si le login n'existe pas encore, puis renvoie un token Bearer.
-`POST /api/quizzes/:id/share` ajoute un collaborateur à partir de son login. Un collaborateur peut lire et modifier la playlist, sans en devenir propriétaire.
+`POST /api/auth/login` crée automatiquement le compte si l'email n'existe pas encore, puis renvoie un token Bearer.
+`POST /api/quizzes/:id/share` ajoute un collaborateur à partir de son email. Un collaborateur peut lire et modifier la playlist, sans en devenir propriétaire.
 `GET /api/me` renvoie les infos du user connecté, dont `accessToken` et `refreshToken`.
 
 Exemples payload tokens:
@@ -187,6 +187,7 @@ Migrations SQL:
 
 - `server/sql/001_init.sql`
 - `server/sql/002_add_user_streaming_tokens.sql`
+- `server/sql/003_add_user_email.sql`
 
 ## Notes
 

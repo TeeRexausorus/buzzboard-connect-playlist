@@ -18,7 +18,7 @@ type QuizRow = {
   user_id: string | null;
   name: string;
   questions: unknown;
-  owner_login: string | null;
+  owner_email: string | null;
   created_at: Date | string;
   updated_at: Date | string;
 };
@@ -27,7 +27,7 @@ type QuizAccess = "owned" | "shared";
 
 type UserRow = {
   id: string;
-  login: string;
+  email: string;
   password_hash: string;
   access_token?: string | null;
   refresh_token?: string | null;
@@ -35,7 +35,7 @@ type UserRow = {
 
 type CurrentUserRow = {
   id: string;
-  login: string;
+  email: string;
   access_token: string | null;
   refresh_token: string | null;
   created_at: Date | string;
@@ -47,7 +47,7 @@ type QuizCollaboratorRow = {
   quiz_id: string;
   user_id: string;
   granted_by: string;
-  login: string;
+  email: string;
   created_at: Date | string;
 };
 
@@ -56,7 +56,7 @@ const mapRowToQuiz = (row: QuizRow, currentUserId?: string) => ({
   name: row.name,
   questions: row.questions,
   access: row.user_id === currentUserId ? "owned" : "shared" satisfies QuizAccess,
-  ownerLogin: row.owner_login,
+  ownerEmail: row.owner_email,
   createdAt: new Date(row.created_at).getTime(),
   updatedAt: new Date(row.updated_at).getTime(),
 });
@@ -65,13 +65,13 @@ const mapRowToQuizCollaborator = (row: QuizCollaboratorRow) => ({
   id: row.id,
   quizId: row.quiz_id,
   userId: row.user_id,
-  login: row.login,
+  email: row.email,
   createdAt: new Date(row.created_at).getTime(),
 });
 
 const mapRowToCurrentUser = (row: CurrentUserRow) => ({
   id: row.id,
-  login: row.login,
+  email: row.email,
   accessToken: row.access_token,
   refreshToken: row.refresh_token,
   createdAt: new Date(row.created_at).getTime(),
@@ -159,7 +159,7 @@ const requireAuth: express.RequestHandler = (req, res, next) => {
 const findOwnedQuiz = async (quizId: string, userId: string): Promise<QuizRow | null> => {
   const result = await pool.query<QuizRow>(
     `
-    SELECT q.id, q.user_id, q.name, q.questions, u.login AS owner_login, q.created_at, q.updated_at
+    SELECT q.id, q.user_id, q.name, q.questions, u.email AS owner_email, q.created_at, q.updated_at
     FROM quizzes q
     INNER JOIN users u ON u.id = q.user_id
     WHERE q.id = $1 AND q.user_id = $2
@@ -173,7 +173,7 @@ const findOwnedQuiz = async (quizId: string, userId: string): Promise<QuizRow | 
 const findAccessibleQuiz = async (quizId: string, userId: string): Promise<QuizRow | null> => {
   const result = await pool.query<QuizRow>(
     `
-    SELECT q.id, q.user_id, q.name, q.questions, u.login AS owner_login, q.created_at, q.updated_at
+    SELECT q.id, q.user_id, q.name, q.questions, u.email AS owner_email, q.created_at, q.updated_at
     FROM quizzes q
     INNER JOIN users u ON u.id = q.user_id
     WHERE q.id = $1
@@ -195,7 +195,7 @@ const findAccessibleQuiz = async (quizId: string, userId: string): Promise<QuizR
 const findCurrentUser = async (userId: string): Promise<CurrentUserRow | null> => {
   const result = await pool.query<CurrentUserRow>(
     `
-    SELECT id, login, access_token, refresh_token, created_at, updated_at
+    SELECT id, email, access_token, refresh_token, created_at, updated_at
     FROM users
     WHERE id = $1
     `,
@@ -217,11 +217,11 @@ app.get("/api/health", (_req, res) => {
 app.post("/api/auth/login", async (req, res, next) => {
   try {
     const payload = loginSchema.parse(req.body);
-    const normalizedLogin = payload.login.trim().toLowerCase();
+    const normalizedEmail = payload.email.trim().toLowerCase();
 
     const existing = await pool.query<UserRow>(
-      "SELECT id, login, password_hash, access_token, refresh_token FROM users WHERE login = $1",
-      [normalizedLogin],
+      "SELECT id, email, password_hash, access_token, refresh_token FROM users WHERE email = $1",
+      [normalizedEmail],
     );
 
     let user: UserRow;
@@ -230,11 +230,11 @@ app.post("/api/auth/login", async (req, res, next) => {
     if (existing.rowCount === 0) {
       const inserted = await pool.query<UserRow>(
         `
-        INSERT INTO users (id, login, password_hash)
-        VALUES ($1, $2, $3)
-        RETURNING id, login, password_hash, access_token, refresh_token
+        INSERT INTO users (id, login, email, password_hash)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, email, password_hash, access_token, refresh_token
         `,
-        [randomUUID(), normalizedLogin, hashPassword(payload.password)],
+        [randomUUID(), normalizedEmail, normalizedEmail, hashPassword(payload.password)],
       );
       user = inserted.rows[0];
       created = true;
@@ -253,7 +253,7 @@ app.post("/api/auth/login", async (req, res, next) => {
       expiresAt: session.expiresAt,
       user: {
         id: user.id,
-        login: user.login,
+        email: user.email,
       },
       ...(user.access_token ? { accessToken: user.access_token } : {}),
       ...(user.refresh_token ? { refreshToken: user.refresh_token } : {}),
@@ -309,7 +309,7 @@ app.put("/api/me/tokens", requireAuth, async (req, res, next) => {
           refresh_token = $3,
           updated_at = NOW()
       WHERE id = $1
-      RETURNING id, login, access_token, refresh_token, created_at, updated_at
+      RETURNING id, email, access_token, refresh_token, created_at, updated_at
       `,
       [authReq.auth.userId, payload.accessToken, payload.refreshToken],
     );
@@ -339,7 +339,7 @@ app.patch("/api/me/tokens", requireAuth, async (req, res, next) => {
           refresh_token = CASE WHEN $4 THEN $5 ELSE refresh_token END,
           updated_at = NOW()
       WHERE id = $1
-      RETURNING id, login, access_token, refresh_token, created_at, updated_at
+      RETURNING id, email, access_token, refresh_token, created_at, updated_at
       `,
       [
         authReq.auth.userId,
@@ -366,7 +366,7 @@ app.get("/api/quizzes", requireAuth, async (req, res, next) => {
     const authReq = req as AuthenticatedRequest;
     const result = await pool.query<QuizRow>(
       `
-      SELECT DISTINCT q.id, q.user_id, q.name, q.questions, owner_user.login AS owner_login, q.created_at, q.updated_at
+      SELECT DISTINCT q.id, q.user_id, q.name, q.questions, owner_user.email AS owner_email, q.created_at, q.updated_at
       FROM quizzes q
       INNER JOIN users owner_user ON owner_user.id = q.user_id
       LEFT JOIN quiz_collaborators qc
@@ -516,11 +516,11 @@ app.get("/api/quizzes/:id/share", requireAuth, async (req, res, next) => {
 
     const result = await pool.query<QuizCollaboratorRow>(
       `
-      SELECT qc.id, qc.quiz_id, qc.user_id, qc.granted_by, u.login, qc.created_at
+      SELECT qc.id, qc.quiz_id, qc.user_id, qc.granted_by, u.email, qc.created_at
       FROM quiz_collaborators qc
       INNER JOIN users u ON u.id = qc.user_id
       WHERE qc.quiz_id = $1
-      ORDER BY u.login ASC
+      ORDER BY u.email ASC
       `,
       [quizId],
     );
@@ -547,11 +547,11 @@ app.post("/api/quizzes/:id/share", requireAuth, async (req, res, next) => {
     }
 
     const payload = shareQuizWithUserSchema.parse(req.body);
-    const normalizedLogin = payload.login.trim().toLowerCase();
+    const normalizedEmail = payload.email.trim().toLowerCase();
 
     const targetUserResult = await pool.query<UserRow>(
-      "SELECT id, login, password_hash FROM users WHERE login = $1",
-      [normalizedLogin],
+      "SELECT id, email, password_hash FROM users WHERE email = $1",
+      [normalizedEmail],
     );
 
     if (targetUserResult.rowCount === 0) {
@@ -578,7 +578,7 @@ app.post("/api/quizzes/:id/share", requireAuth, async (req, res, next) => {
 
     const collaboratorResult = await pool.query<QuizCollaboratorRow>(
       `
-      SELECT qc.id, qc.quiz_id, qc.user_id, qc.granted_by, u.login, qc.created_at
+      SELECT qc.id, qc.quiz_id, qc.user_id, qc.granted_by, u.email, qc.created_at
       FROM quiz_collaborators qc
       INNER JOIN users u ON u.id = qc.user_id
       WHERE qc.id = $1
@@ -592,7 +592,7 @@ app.post("/api/quizzes/:id/share", requireAuth, async (req, res, next) => {
   }
 });
 
-app.delete("/api/quizzes/:id/share/:login", requireAuth, async (req, res, next) => {
+app.delete("/api/quizzes/:id/share/:email", requireAuth, async (req, res, next) => {
   try {
     const quizId = getSingleParam(req.params.id);
     if (!quizId) {
@@ -600,9 +600,9 @@ app.delete("/api/quizzes/:id/share/:login", requireAuth, async (req, res, next) 
       return;
     }
 
-    const collaboratorLogin = getSingleParam(req.params.login);
-    if (!collaboratorLogin) {
-      res.status(400).json({ message: "Invalid collaborator login" });
+    const collaboratorEmail = getSingleParam(req.params.email);
+    if (!collaboratorEmail) {
+      res.status(400).json({ message: "Invalid collaborator email" });
       return;
     }
 
@@ -620,10 +620,10 @@ app.delete("/api/quizzes/:id/share/:login", requireAuth, async (req, res, next) 
         AND user_id IN (
           SELECT id
           FROM users
-          WHERE login = $2
+          WHERE email = $2
         )
       `,
-      [quizId, collaboratorLogin.trim().toLowerCase()],
+      [quizId, collaboratorEmail.trim().toLowerCase()],
     );
 
     res.status(204).send();

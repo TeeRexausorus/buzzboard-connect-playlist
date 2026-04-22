@@ -37,12 +37,12 @@ export const createQuizSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  login: z.string().trim().min(3).max(100),
+  email: z.string().trim().email().max(255),
   password: z.string().min(6).max(255),
 });
 
 export const shareQuizWithUserSchema = z.object({
-  login: z.string().trim().min(3).max(100),
+  email: z.string().trim().email().max(255),
 });
 
 const tokenSchema = z.string().trim().min(1).max(4096);

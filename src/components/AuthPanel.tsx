@@ -11,7 +11,7 @@ interface AuthPanelProps {
 }
 
 export const AuthPanel = ({ auth }: AuthPanelProps) => {
-  const [loginValue, setLoginValue] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -21,7 +21,7 @@ export const AuthPanel = ({ auth }: AuthPanelProps) => {
     setInfo(null);
 
     try {
-      const result = await auth.login(loginValue, password);
+      const result = await auth.login(email, password);
       setInfo(result.created ? "Compte créé et connecté." : "Connexion réussie.");
       setPassword("");
     } catch (err) {
@@ -37,7 +37,7 @@ export const AuthPanel = ({ auth }: AuthPanelProps) => {
           <div>
             <h3 className="text-sm font-semibold text-foreground">Compte quiz</h3>
             <p className="text-xs text-muted-foreground">
-              {auth.user ? `Connecté en tant que ${auth.user.login}` : "Connexion login/mot de passe"}
+              {auth.user ? `Connecté en tant que ${auth.user.email}` : "Connexion email/mot de passe"}
             </p>
           </div>
         </div>
@@ -53,13 +53,14 @@ export const AuthPanel = ({ auth }: AuthPanelProps) => {
       {!auth.user && (
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
           <div>
-            <Label htmlFor="quiz-login" className="text-sm text-foreground">Login</Label>
+            <Label htmlFor="quiz-email" className="text-sm text-foreground">Email</Label>
             <Input
-              id="quiz-login"
-              value={loginValue}
-              onChange={(e) => setLoginValue(e.target.value)}
+              id="quiz-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              placeholder="admin"
+              placeholder="you@example.com"
               className="mt-1 bg-input border-border text-foreground"
             />
           </div>
@@ -77,7 +78,7 @@ export const AuthPanel = ({ auth }: AuthPanelProps) => {
           </div>
           <Button
             onClick={handleSubmit}
-            disabled={auth.isLoading || !loginValue.trim() || password.length < 6}
+            disabled={auth.isLoading || !email.trim() || password.length < 6}
             className="bg-primary hover:bg-primary/90"
           >
             Se connecter
@@ -89,7 +90,7 @@ export const AuthPanel = ({ auth }: AuthPanelProps) => {
       {error && <p className="text-xs text-destructive">{error}</p>}
       {!auth.user && (
         <p className="text-xs text-muted-foreground">
-          Si le login n’existe pas encore, le backend crée automatiquement le compte.
+          Si l'email n’existe pas encore, le backend crée automatiquement le compte.
         </p>
       )}
     </Card>
